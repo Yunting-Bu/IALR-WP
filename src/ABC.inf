@@ -1,0 +1,92 @@
+! The input file for A+BC cold nonadiabatic reactive scattering, using IALR(Interaction-Asymptotic-Long Range) mothed.
+
+! Task types for the calculation
+&task
+    reactChannel       = 2                          ! Number of reactive channels
+    IF_inelastic       = 0                          ! Inelastic calculation flag  
+    Atoms              = O, O, H                    ! Atoms, A B C order 
+    nPES               = 2                          ! Number of PESs
+    energyUnit         = 1                          ! Energy unit: 1 for cm-1, 2 for eV, 3 for Kelvin, 4 for Hartree
+    potentialType      = New                        ! Potential type: Read or New
+/    
+
+! Parameters for initial wave packet
+&initWP
+    j0                 = 0                          ! Initial rotational quantum number
+    v0                 = 0                          ! Initial vibrational quantum number
+    l0                 = 0                          ! Initial orbital angular momentum
+    Jtot               = 0                          ! Total angular momentum
+    totalParity        = 1                          ! Total parity
+    jparity            = 0                          ! Rotational parity
+    WP_Zc              = 100.0                      ! Initial center of WP
+    WP_delta           = 0.5                        ! Initial width of WP
+    WP_Ec              = 1.0                        ! Initial kinetic energy of WP
+    initPES            = 1                          ! Initial PES index
+/
+
+! Parameters for IALR
+&IALR
+   Z_range             = 1.0, 3000.0                ! Z grid range (I+A+lr)
+   nZtot               = 29999                      ! Number of Z grid points (I+A+lr)
+   nZasy               = 799                        ! Number of Z grid points for asymptotic region
+   nZint               = 49                         ! Number of Z grid points for interaction region
+   r_range             = 0.4, 6.0                   ! r grid range
+   vint                = 15                         ! Number of v for interaction region
+   jint                = 20                         ! Number of j for interaction region
+   vasy                = 10                         ! Number of v for asymptotic region
+   jasy                = 20                         ! Number of j for asymptotic region
+/
+
+! Parameters for propagation
+&propagation
+    T_tot             = 1000000                     ! Total propagation time
+    timeStep          = 10                          ! Time step for propagation
+    timePrint         = 1000                        ! Time interval for printing
+/
+
+! Energy 
+&energy
+    E_range           = 0.01, 1.0                   ! Energy range
+    dE                = 0.01                        ! Energy step
+/
+
+! Absorbing potential parameters (2D abs)
+&Vabs
+    Zasy_range        = 40.0, 80.0                  ! Z grid range for asymptotic absorbing potential
+    Casy              = 0.005                       ! Coefficient for asymptotic absorbing potential
+    Zlr_range         = 200.0, 3000.0               ! Z grid range for long-range absorbing potential
+    Clr               = 0.00001                     ! Coefficient for long-range absorbing potential
+    rabs_range        = 4.0, 6.0                    ! r grid range for radial absorbing potential
+    Cr                = 0.01                        ! Coefficient for radial absorbing potential
+/
+
+! Parameters for inelastic 
+&inelastic
+    vpmax             = 10                          ! Maximum vibrational quantum number
+    jpmax             = 20                          ! Maximum rotational quantum number
+    project_Zine      = 35.0                        ! Projection plane for inelastic
+    T_ine             = 10000                       ! When analysis starts for inelastic
+/
+
+! Parameters for channel 1
+&channel1
+    rp_range          = 0.5, 5.0                    ! r grid range for product 1
+    nrp               = 300                         ! Number of r grid points for product 1
+    vp1max            = 15                          ! Maximum vibrational quantum number for product 1
+    jp1max            = 25                          ! Maximum rotational quantum number for product 1
+    jpar1             = 0                           ! Rotational parity for product 1
+    rinf1             = 15.0                        ! Projection plane for product 1
+    midcoor1          = 1                           ! Intermediate coordinate choice for product 1
+/
+
+! Parameters for channel 2
+&channel2
+    rp_range         = 0.5, 5.0
+    nrp              = 300
+    vp2max           = 15
+    jp2max           = 25
+    jpar2            = 0
+    rinf2            = 15.0
+    midcoor2         = 1
+/
+    
