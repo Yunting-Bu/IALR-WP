@@ -21,10 +21,12 @@ module gPara
 !> ========== Global Parameters ==========
 
     type :: initWP_class
-        integer :: j0, v0, Jtot, tpar, jpar
+        integer :: j0, v0, l0, Jtot, tpar, jpar
         real(f8) :: Zc, delta, Ec
         integer :: initPES
         integer :: Kmin, jmin, jinc 
+       integer :: nChannels
+       integer :: qn_channel(:,:,:,:)
     end type initWP_class
 
     type :: IALR_class
@@ -72,7 +74,7 @@ module gPara
 
     integer :: reactChannel, IF_inelastic, nPES, energyUnit
     integer :: T_tot, timeStep, timePrint
-    integer :: nEtot  
+    integer :: nEtot, outFileUnit
     real(f8) :: E_range(2), dE, Etot
     real(f8) :: atomMass(3), massBC, massTot
     character(len=2) :: Atoms(3), potentialType
@@ -103,24 +105,27 @@ contains
 
     subroutine initPara()
         implicit none
-        integer :: iEtot, outFileUnit
+        integer :: iEtot, inpFileUnit
         real(f8) :: temp
 
 !> ========== Read parameters from input file ==========
 
-        open(unit=233, file="ABC.inf", status='old')
-        read(233, nml=task) 
-        read(233, nml=energy) 
-        read(233, nml=initWP)
-        read(233, nml=IALR)
-        read(233, nml=Vabs)
-        read(233, nml=propagation)
-        read(233, nml=channel1)
+        open(unit=inpFileUnit, file="ABC.inf", status='old')
+        read(inpFileUnit, nml=task) 
+        read(inpFileUnit, nml=energy) 
+        read(inpFileUnit, nml=initWP)
+        read(inpFileUnit, nml=IALR)
+        read(inpFileUnit, nml=Vabs)
+        read(inpFileUnit, nml=propagation)
+        read(inpFileUnit, nml=channel1)
 
-        if (reactChannel == 2) read(233, nml=channel2)
-        if (IF_inelastic == 0) read(233, nml=inelastic) 
+        if (reactChannel == 2) read(inpFileUnit, nml=channel2)
+        if (IF_inelastic == 0) read(inpFileUnit, nml=inelastic) 
 
-        close(233)
+        close(inpFileUnit)
+        
+        open(newunit=outFileUnit, file=trim(outfile)//".out", status='replace')
+        !> Should add more output files later
 
 !> ========== Construct collision energy ==========
 
@@ -141,8 +146,8 @@ contains
         else if (initWP%tpar == -1) then 
             initWP%Kmin = 1
         else 
-            write(*,*) "Error: total parity tpar must be 1 or -1."
-            write(*,*) "POSITION: globalPara.f90, subroutine initPara()"
+            write(outFileUnit,*) "Error: total parity tpar must be 1 or -1."
+            write(outFileUnit,*) "POSITION: globalPara.f90, subroutine initPara()"
             stop
         end if
 
@@ -179,7 +184,6 @@ contains
 
 !> ========== Output ==========
 
-        open(newunit=outFileUnit, file="output.inf", status='replace')
         write(outFileUnit,'(1x,a)') " ========== Input Parameters =========="
         write(outFileUnit,'(1x,a,a,a)') "Atoms A-B-C: ", Atoms(1), Atoms(2), Atoms(3)
         write(outFileUnit,'(1x,a,2i4)') "v0, j0 = ", initWP%v0, initWP%j0
@@ -205,8 +209,8 @@ contains
         do iatm = 1, 3 
             ipos = findloc(elemSymbol, Atoms(iatm))
             if (ipos == 0) then
-                write(*,*) "Error: Unsupported element ", Atoms(iatm)
-                write(*,*) "POSITION: globalPara.f90, subroutine getMass()"
+                write(outFileUnit,*) "Error: Unsupported element ", Atoms(iatm)
+                write(outFileUnit,*) "POSITION: globalPara.f90, subroutine getMass()"
                 stop
             else
                 atomMass(iatm) = elemMass(ipos)*amu2au
@@ -232,8 +236,8 @@ contains
         if (abs(atomMass(2)-atomMass(3)) < eps) then
             !> B and C are identical atoms
             if (initWP%jpar /= 0) then
-                write(*,*) "Error: For identical atoms, BC parity jpar must be 0."
-                write(*,*) "POSITION: globalPara.f90, subroutine diatomParity()"
+                write(outFileUnit,*) "Error: For identical atoms, BC parity jpar must be 0."
+                write(outFileUnit,*) "POSITION: globalPara.f90, subroutine diatomParity()"
                 stop
             end if
         end if
@@ -243,8 +247,8 @@ contains
         if (abs(atomMass(1)-atomMass(2)) < eps) then
             !> A and B are identical atoms
             if (channel1%jpar /= 0) then
-                write(*,*) "Error: For identical atoms, AB parity jpar must be 0."
-                write(*,*) "POSITION: globalPara.f90, subroutine diatomParity()"
+                write(outFileUnit,*) "Error: For identical atoms, AB parity jpar must be 0."
+                write(outFileUnit,*) "POSITION: globalPara.f90, subroutine diatomParity()"
                 stop
             end if
         end if
@@ -255,8 +259,8 @@ contains
             if (abs(atomMass(1)-atomMass(3)) < eps) then
                 !> A and C are identical atoms
                 if (channel2%jpar /= 0) then
-                    write(*,*) "Error: For identical atoms, AC parity jpar must be 0."
-                    write(*,*) "POSITION: globalPara.f90, subroutine diatomParity()"
+                    write(outFileUnit,*) "Error: For identical atoms, AC parity jpar must be 0."
+                    write(outFileUnit,*) "POSITION: globalPara.f90, subroutine diatomParity()"
                     stop
                 end if
             end if

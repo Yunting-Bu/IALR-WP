@@ -59,5 +59,22 @@ contains
         call DVR_TransMatAndKinetic(range_r, IALR%nr_DVR, massBC, IALR%kin_r, IALR%B_r)
 
     end subroutine DVR_IALR
+
+    subroutine setChannel()
+        implicit none
+        integer :: ichnl, v, j, K, Kmax
+
+        ichnl = 0
+        do v = 0, ine%vmax
+            do j = initWP%jmin, initWP%jmax, initWP%jinc
+                Kmax = min(j, initWP%Jtot)
+                do K = initWP%Kmin, Kmax
+                    ichnl = ichnl + 1
+                end do
+            end do
+        end do
+        initWP%nChannels = ichnl
+
+    end subroutine setChannel
     
 end module basisMod

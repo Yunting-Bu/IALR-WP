@@ -15,6 +15,7 @@
 &initWP
     j0                 = 0                          ! Initial rotational quantum number
     v0                 = 0                          ! Initial vibrational quantum number
+    l0                 = 0                          ! Initial orbital angular momentum quantum number
     Jtot               = 0                          ! Total angular momentum
     tpar               = 1                          ! Total parity
     jpar               = 0                          ! Rotational parity
