@@ -8,13 +8,13 @@
     nPES               = 2                          ! Number of PESs
     energyUnit         = 1                          ! Energy unit: 1 for cm-1, 2 for eV, 3 for Kelvin, 4 for Hartree
     potentialType      = New                        ! Potential type: Read or New
+    outfile            = OOH                        ! Output file name (.out, don't need to add extension)
 /    
 
 ! Parameters for initial wave packet
 &initWP
     j0                 = 0                          ! Initial rotational quantum number
     v0                 = 0                          ! Initial vibrational quantum number
-    l0                 = 0                          ! Initial orbital angular momentum
     Jtot               = 0                          ! Total angular momentum
     tpar               = 1                          ! Total parity
     jpar               = 0                          ! Rotational parity
@@ -27,10 +27,11 @@
 ! Parameters for IALR
 &IALR
    Z_range             = 1.0, 3000.0                ! Z grid range (I+A+lr)
-   nZtot               = 29999                      ! Number of Z grid points (I+A+lr)
-   nZasy               = 799                        ! Number of Z grid points for asymptotic region
-   nZint               = 49                         ! Number of Z grid points for interaction region
+   nZ_IALR             = 29999                      ! Number of Z grid points (I+A+lr)
+   nZ_IA               = 799                        ! Number of Z grid points for asymptotic + interaction region
+   nZ_I                = 49                         ! Number of Z grid points for interaction region
    r_range             = 0.4, 6.0                   ! r grid range
+   nr_DVR              = 300                        ! Number of r grid points for DVR   
    vint                = 15                         ! Number of v for interaction region
    jint                = 20                         ! Number of j for interaction region
    vasy                = 10                         ! Number of v for asymptotic region

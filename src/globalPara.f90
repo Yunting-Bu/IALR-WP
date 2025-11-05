@@ -1,5 +1,5 @@
 module gPara
-    use, intrinsic :: iso_fortran_env, only : f8 => real64
+    use machina_basic , only : f8, c8
     implicit none
     public
 
@@ -15,21 +15,30 @@ module gPara
     real(f8), parameter :: K2au = 1.0_f8 / au2K
     real(f8), parameter :: amu2au = 1822.888486209_f8
     real(f8), parameter :: pi = 4.0_f8*atan(1.0_f8)
+    real(f8), parameter :: one = 1.0_f8
+    real(c8), parameter :: img = (0.0_f8, 1.0_f8)
    
 !> ========== Global Parameters ==========
 
     type :: initWP_class
-        integer :: j0, v0, l0, Jtot, tpar, jpar
+        integer :: j0, v0, Jtot, tpar, jpar
         real(f8) :: Zc, delta, Ec
         integer :: initPES
-        integer :: Kmax, Kmin, K0, jmin, jinc 
+        integer :: Kmin, jmin, jinc 
     end type initWP_class
 
     type :: IALR_class
-       integer :: nZtot, nZasy, nZint
+       integer :: nZ_IALR, nZ_IA, nZ_I, nr_DVR 
        integer :: vint, jint, vasy, jasy 
        real(f8) :: Z_range(2), r_range(2)
-       real(f8), allocatable :: Ztot(:), Zasy(:), Zint(:) 
+!> I - interaction region
+!> A - asymptotic region
+!> LR - long range region
+!> kin for Kinetic energy of 1D box 
+!> B for DVR-FBR transformation matrix
+       real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_DVR(:)
+       real(f8), allocatable :: kinZ_IALR(:), kinZ_IA(:), kinZ_I(:), kin_r(:)
+       real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_r(:,:)
     end type IALR_class
 
     type :: Vabs_class
@@ -67,6 +76,7 @@ module gPara
     real(f8) :: E_range(2), dE, Etot
     real(f8) :: atomMass(3), massBC, massTot
     character(len=2) :: Atoms(3), potentialType
+    character(len=50) :: outfile
     real(f8) :: energyUnitTrans(4) = [cm2au, ev2au, K2au, 1.0_f8]
 
     type(initWP_class) :: initWP
@@ -78,7 +88,7 @@ module gPara
 
 !> ========== Namelists ==========
 
-    namelist /task/ reactChannel, IF_inelastic, Atoms, nPES, energyUnit, potentialType
+    namelist /task/ reactChannel, IF_inelastic, Atoms, nPES, energyUnit, potentialType, outfile
     namelist /energy/ E_range, dE
     namelist /initWP/ initWP
     namelist /IALR/ IALR
@@ -93,7 +103,7 @@ contains
 
     subroutine initPara()
         implicit none
-        integer :: iEtot
+        integer :: iEtot, outFileUnit
         real(f8) :: temp
 
 !> ========== Read parameters from input file ==========
@@ -139,6 +149,46 @@ contains
         call getMass()
         call diatomParity()
 
+!> Interaction-Asympotic-Lonng-Range (IALR) range
+!>  |----|
+!>  |----|----|
+!>  |----|----|----|
+!>  |----|----|----|
+!>  Z1   Z2   Z3   Z4
+!>  VAbs: Z3 = Zabs_asy_end, Z4 = Zabs_lr_end
+
+!> Allocate IALR DVR grids, kinetic energy and transMatrix
+        allocate(IALR%Z_IALR(IALR%nZ_IALR))
+        allocate(IALR%Z_IA(IALR%nZ_IA))
+        allocate(IALR%Z_I(IALR%nZ_I))
+        allocate(IALR%kinZ_IALR(IALR%nZ_IALR))
+        allocate(IALR%kinZ_IA(IALR%nZ_IA))
+        allocate(IALR%kinZ_I(IALR%nZ_I))
+        allocate(IALR%BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
+        allocate(IALR%BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
+        allocate(IALR%BZ_I(IALR%nZ_I, IALR%nZ_I))
+        allocate(IALR%r_DVR(IALR%nr_DVR))
+        allocate(IALR%kin_r(IALR%nr_DVR))
+        allocate(IALR%B_r(IALR%nr_DVR, IALR%nr_DVR))
+!> Allocate Vabs grids and Vabs
+        allocate(Vabs%Zasy(Vabs%nZasy), Vabs%ZLr(Vabs%nZlr), Vabs%rabs(Vabs%nZint))
+        allocate(Vabs%Fasy(Vabs%nZasy), Vabs%Flr(Vabs%nZlr), Vabs%Fabs(Vabs%nZint))
+!> Allocate channel rp grids
+        allocate(channel1%rp(channel1%nrp))
+        if (reactChannel == 2) allocate(channel2%rp(channel2%nrp))
+
+!> ========== Output ==========
+
+        open(newunit=outFileUnit, file="output.inf", status='replace')
+        write(outFileUnit,'(1x,a)') " ========== Input Parameters =========="
+        write(outFileUnit,'(1x,a,a,a)') "Atoms A-B-C: ", Atoms(1), Atoms(2), Atoms(3)
+        write(outFileUnit,'(1x,a,2i4)') "v0, j0 = ", initWP%v0, initWP%j0
+        write(outFileUnit,'(1x,a,i4)') "Total angular momentum Jtot = ", initWP%Jtot
+        write(outFileUnit,'(1x,a,i4)') "Total parity = ", initWP%tpar
+        write(outFileUnit,'(1x,a,i4)') "Number of PESs = ", nPES
+        
+
+
     end subroutine initPara
 
     subroutine getMass()
@@ -147,8 +197,8 @@ contains
         character(len=2), parameter :: elemSymbol(nSupportedElements) = &
             ['H ', 'D', 'He', 'Li', 'N ', 'O ', 'F ', 'S', 'Cl', 'Ar']
         real(f8), parameter :: elemMass(nSupportedElements) = &
-            [1.00784_f8, 2.01410_f8, 4.002602_f8, 6.938_f8, 14.003074_f8, &
-             15.99491461957_f8, 18.998403163_f8, 32.06_f8, 34.968852682_f8, 39.9623831237_f8]
+            [1.00782503223_f8, 2.01410177812_f8, 4.002602_f8, 6.938_f8, 14.00307400443_f8, &
+             15.99491461957_f8, 18.99840316273_f8, 32.06_f8, 34.968852682_f8, 39.9623831237_f8]
         
         integer :: iatm, ipos
 
