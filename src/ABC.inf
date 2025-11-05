@@ -16,11 +16,11 @@
     v0                 = 0                          ! Initial vibrational quantum number
     l0                 = 0                          ! Initial orbital angular momentum
     Jtot               = 0                          ! Total angular momentum
-    totalParity        = 1                          ! Total parity
-    jparity            = 0                          ! Rotational parity
-    WP_Zc              = 100.0                      ! Initial center of WP
-    WP_delta           = 0.5                        ! Initial width of WP
-    WP_Ec              = 1.0                        ! Initial kinetic energy of WP
+    tpar               = 1                          ! Total parity
+    jpar               = 0                          ! Rotational parity
+    Zc                 = 100.0                      ! Initial center of WP
+    delta              = 0.5                        ! Initial width of WP
+    Ec                 = 1.0                        ! Initial kinetic energy of WP
     initPES            = 1                          ! Initial PES index
 /
 
@@ -50,7 +50,7 @@
     dE                = 0.01                        ! Energy step
 /
 
-! Absorbing potential parameters (2D abs)
+! Absorbing potential parameters
 &Vabs
     Zasy_range        = 40.0, 80.0                  ! Z grid range for asymptotic absorbing potential
     Casy              = 0.005                       ! Coefficient for asymptotic absorbing potential
@@ -62,31 +62,31 @@
 
 ! Parameters for inelastic 
 &inelastic
-    vpmax             = 10                          ! Maximum vibrational quantum number
-    jpmax             = 20                          ! Maximum rotational quantum number
+    vmax             = 10                           ! Maximum vibrational quantum number
+    jmax             = 20                           ! Maximum rotational quantum number
     project_Zine      = 35.0                        ! Projection plane for inelastic
     T_ine             = 10000                       ! When analysis starts for inelastic
 /
 
-! Parameters for channel 1
+! Parameters for channel 1 : C+AB
 &channel1
     rp_range          = 0.5, 5.0                    ! r grid range for product 1
     nrp               = 300                         ! Number of r grid points for product 1
-    vp1max            = 15                          ! Maximum vibrational quantum number for product 1
-    jp1max            = 25                          ! Maximum rotational quantum number for product 1
-    jpar1             = 0                           ! Rotational parity for product 1
-    rinf1             = 15.0                        ! Projection plane for product 1
-    midcoor1          = 1                           ! Intermediate coordinate choice for product 1
+    vpmax             = 15                          ! Maximum vibrational quantum number for product 1
+    jpmax             = 25                          ! Maximum rotational quantum number for product 1
+    jpar              = 0                           ! Rotational parity for product 1
+    rinf              = 15.0                        ! Projection plane for product 1
+    midcoor           = 1                           ! Intermediate coordinate choice for product 1
 /
 
-! Parameters for channel 2
+! Parameters for channel 2 : B+AC
 &channel2
     rp_range         = 0.5, 5.0
     nrp              = 300
-    vp2max           = 15
-    jp2max           = 25
-    jpar2            = 0
-    rinf2            = 15.0
-    midcoor2         = 1
+    vpmax            = 15
+    jpmax            = 25
+    jpar             = 0
+    rinf             = 15.0
+    midcoor          = 1
 /
     
