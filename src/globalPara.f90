@@ -58,16 +58,20 @@ module gPara
 
 !> ========== Parameters from input file ==========
 
+!> Task types and propagation settings
     integer :: reactChannel, nPES, energyUnit
     integer :: T_tot, timeStep, timePrint
+!> Energy input
     integer :: nEtot, outFileUnit
     real(f8) :: E_range(2), dE
-    real(f8) :: atomMass(3), massBC, massTot
     real(f8), allocatable :: Etot(:)
+    real(f8) :: energyUnitTrans(4) = [cm2au, ev2au, K2au, 1.0_f8]
+!> Atoms and masses
+    real(f8) :: atomMass(3), massBC, massTot
     character(len=2) :: Atoms(3)
+!> Output and other flags
     character(len=3) :: potentialType
     character(len=50) :: outfile
-    real(f8) :: energyUnitTrans(4) = [cm2au, ev2au, K2au, 1.0_f8]
     logical :: IF_inelastic
 !> Channels
     integer :: nChannels
@@ -77,16 +81,16 @@ module gPara
 !> LR - long range region
 !> kin for Kinetic energy of 1D box 
 !> B for DVR-FBR transformation matrix
-       real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_DVR(:)
-       real(f8), allocatable :: kinZ_IALR(:), kinZ_IA(:), kinZ_I(:), kin_r(:)
-       real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_r(:,:)
+    real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_DVR(:)
+    real(f8), allocatable :: kinZ_IALR(:), kinZ_IA(:), kinZ_I(:), kin_r(:)
+    real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_r(:,:)
 !> Vabs grids and value
-        real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
-        real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
+    real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
+    real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
 !> Product channel grids
-        real(f8), allocatable :: rp1(:)
-        real(f8), allocatable :: rp2(:)
-
+    real(f8), allocatable :: rp1(:)
+    real(f8), allocatable :: rp2(:)
+!> Tpyes declarations
     type(initWP_class) :: initWP
     type(IALR_class) :: IALR 
     type(Vabs_class) :: Vabs 
@@ -191,11 +195,15 @@ contains
 !> ========== Output ==========
 
         write(outFileUnit,'(1x,a)') " ========== Input Parameters =========="
+        write(outFileUnit,'(1x,a,a,a)') "Reaction Channel: ", &
+            merge("A + BC -> AB + C", "A + BC -> AB + C and AC + B", reactChannel==1)
         write(outFileUnit,'(1x,a,a,a,a)') "Atoms A, B, C: ", Atoms(1), Atoms(2), Atoms(3)
-        write(outFileUnit,'(1x,a,2i4)') "v0, j0 = ", initWP%v0, initWP%j0
-        write(outFileUnit,'(1x,a,i4)') "Total angular momentum Jtot = ", initWP%Jtot
-        write(outFileUnit,'(1x,a,i4)') "Total parity = ", initWP%tpar
-        write(outFileUnit,'(1x,a,i4)') "Number of PESs = ", nPES
+        write(outFileUnit,'(1x,a,f15.9)') "Reduced Masses of BC (a.u.):", massBC
+        write(outFileUnit,'(1x,a,f15.9)') "Reduced Masses of ABC (a.u.):", massTot
+        write(outFileUnit,'(1x,a,3i4)') "v0, j0, l0 : ", initWP%v0, initWP%j0, initWP%l0
+        write(outFileUnit,'(1x,a,i4)') "Total angular momentum Jtot: ", initWP%Jtot
+        write(outFileUnit,'(1x,a,i4)') "Total parity: ", initWP%tpar
+        write(outFileUnit,'(1x,a,i4)') "Number of PESs: ", nPES
         
 
 
