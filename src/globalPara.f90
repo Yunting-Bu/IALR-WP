@@ -82,7 +82,7 @@ module gPara
 !> kin for Kinetic energy of 1D box 
 !> B for DVR-FBR transformation matrix
     real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_DVR(:)
-    real(f8), allocatable :: kinZ_IALR(:), kinZ_IA(:), kinZ_I(:), kin_r(:)
+    real(f8), allocatable :: kinZ_IALR, kinZ_IA, kinZ_I, kin_r
     real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_r(:,:)
 !> Vabs grids and value
     real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
@@ -179,14 +179,10 @@ contains
         allocate(Z_IALR(IALR%nZ_IALR))
         allocate(Z_IA(IALR%nZ_IA))
         allocate(Z_I(IALR%nZ_I))
-        allocate(kinZ_IALR(IALR%nZ_IALR))
-        allocate(kinZ_IA(IALR%nZ_IA))
-        allocate(kinZ_I(IALR%nZ_I))
         allocate(BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
         allocate(BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
         allocate(BZ_I(IALR%nZ_I, IALR%nZ_I))
         allocate(r_DVR(IALR%nr_DVR))
-        allocate(kin_r(IALR%nr_DVR))
         allocate(B_r(IALR%nr_DVR, IALR%nr_DVR))
 !> Allocate channel rp grids
         allocate(rp1(channel1%nrp))
