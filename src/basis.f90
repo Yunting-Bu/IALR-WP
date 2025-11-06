@@ -15,7 +15,7 @@ contains
         do i = 1, nGrid
             Grid(i) = rMin + i*(rMax - rMin)/(nGrid + 1)
         end do
-    end subroutine DVRGrid
+    end subroutine DVR_Grid
 
     subroutine DVR_TransMatAndKinetic(range, nGrid, mass, Kinetic, TransMat)
         implicit none
@@ -45,18 +45,18 @@ contains
 
         range_IALR = IALR%Z_range(2) - IALR%Z_range(1)
         dR = range_IALR / real(IALR%nZ_IALR + 1, f8)
-        call DVR_Grid(IALR%nZ_IALR, IALR%Z_range(1), IALR%Z_range(2), IALR%Z_IALR)
-        call DVR_TransMatAndKinetic(range_IALR, IALR%nZ_IALR, massTot, IALR%kinZ_IALR, IALR%BZ_IALR)
+        call DVR_Grid(IALR%nZ_IALR, IALR%Z_range(1), IALR%Z_range(2), Z_IALR)
+        call DVR_TransMatAndKinetic(range_IALR, IALR%nZ_IALR, massTot, kinZ_IALR, BZ_IALR)
 
         range_IA = dR * (IALR%nZ_IA + 1)
-        call DVR_TransMatAndKinetic(range_IA, IALR%nZ_IA, massTot, IALR%kinZ_IA, IALR%BZ_IA)
+        call DVR_TransMatAndKinetic(range_IA, IALR%nZ_IA, massTot, kinZ_IA, BZ_IA)
 
         range_I = dR * (IALR%nZ_I + 1)
-        call DVR_TransMatAndKinetic(range_I, IALR%nZ_I, massTot, IALR%kinZ_I, IALR%BZ_I)
+        call DVR_TransMatAndKinetic(range_I, IALR%nZ_I, massTot, kinZ_I, BZ_I)
 
         range_r = IALR%r_range(2) - IALR%r_range(1)
-        call DVR_Grid(IALR%nr_DVR, IALR%r_range(1), IALR%r_range(2), IALR%r_DVR)
-        call DVR_TransMatAndKinetic(range_r, IALR%nr_DVR, massBC, IALR%kin_r, IALR%B_r)
+        call DVR_Grid(IALR%nr_DVR, IALR%r_range(1), IALR%r_range(2), r_DVR)
+        call DVR_TransMatAndKinetic(range_r, IALR%nr_DVR, massBC, kin_r, B_r)
 
     end subroutine DVR_IALR
 
@@ -65,15 +65,29 @@ contains
         integer :: ichnl, v, j, K, Kmax
 
         ichnl = 0
-        do v = 0, ine%vmax
-            do j = initWP%jmin, initWP%jmax, initWP%jinc
+        do v = 0, IALR%vint
+            do j = initWP%jmin, IALR%jint, initWP%jinc
                 Kmax = min(j, initWP%Jtot)
                 do K = initWP%Kmin, Kmax
                     ichnl = ichnl + 1
                 end do
             end do
         end do
-        initWP%nChannels = ichnl
+        nChannels = ichnl
+
+        allocate(qn_channel(nChannels,3))
+        ichnl = 0
+        do v = 0, IALR%vint
+            do j = initWP%jmin, IALR%jint, initWP%jinc
+                Kmax = min(j, initWP%Jtot)
+                do K = initWP%Kmin, Kmax
+                    ichnl = ichnl + 1
+                    qn_channel(ichnl,1) = v
+                    qn_channel(ichnl,2) = j
+                    qn_channel(ichnl,3) = K
+                end do
+            end do
+        end do
 
     end subroutine setChannel
     

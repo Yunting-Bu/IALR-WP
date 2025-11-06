@@ -4,5 +4,7 @@ program IALR_WP_SO
     use basisMod
     implicit none
 
+    call initPara()
+
     
 end program IALR_WP_SO

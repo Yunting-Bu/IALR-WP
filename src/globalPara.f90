@@ -25,29 +25,17 @@ module gPara
         real(f8) :: Zc, delta, Ec
         integer :: initPES
         integer :: Kmin, jmin, jinc 
-       integer :: nChannels
-       integer :: qn_channel(:,:,:,:)
     end type initWP_class
 
     type :: IALR_class
        integer :: nZ_IALR, nZ_IA, nZ_I, nr_DVR 
        integer :: vint, jint, vasy, jasy 
        real(f8) :: Z_range(2), r_range(2)
-!> I - interaction region
-!> A - asymptotic region
-!> LR - long range region
-!> kin for Kinetic energy of 1D box 
-!> B for DVR-FBR transformation matrix
-       real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_DVR(:)
-       real(f8), allocatable :: kinZ_IALR(:), kinZ_IA(:), kinZ_I(:), kin_r(:)
-       real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_r(:,:)
     end type IALR_class
 
     type :: Vabs_class
         real(f8) :: Casy, Clr, Cr 
         real(f8) :: Zasy_range(2), Zlr_range(2), rabs_range(2)
-        real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
-        real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
     end type Vabs_class
 
     type :: ine_class
@@ -60,26 +48,44 @@ module gPara
         integer :: nrp, vpmax, jpmax, jpar, midcoor 
         real(f8) :: rp_range(2), rinf 
         integer :: jmin, jinc
-        real(f8), allocatable :: rp(:)
     end type channel1_class
 
     type :: channel2_class
         integer :: nrp, vpmax, jpmax, jpar, midcoor 
         real(f8) :: rp_range(2), rinf 
         integer :: jmin, jinc
-        real(f8), allocatable :: rp(:)
     end type channel2_class
 
 !> ========== Parameters from input file ==========
 
-    integer :: reactChannel, IF_inelastic, nPES, energyUnit
+    integer :: reactChannel, nPES, energyUnit
     integer :: T_tot, timeStep, timePrint
     integer :: nEtot, outFileUnit
-    real(f8) :: E_range(2), dE, Etot
+    real(f8) :: E_range(2), dE
     real(f8) :: atomMass(3), massBC, massTot
-    character(len=2) :: Atoms(3), potentialType
+    real(f8), allocatable :: Etot(:)
+    character(len=2) :: Atoms(3)
+    character(len=3) :: potentialType
     character(len=50) :: outfile
     real(f8) :: energyUnitTrans(4) = [cm2au, ev2au, K2au, 1.0_f8]
+    logical :: IF_inelastic
+!> Channels
+    integer :: nChannels
+    integer, allocatable :: qn_channel(:,:)
+!> I - interaction region
+!> A - asymptotic region
+!> LR - long range region
+!> kin for Kinetic energy of 1D box 
+!> B for DVR-FBR transformation matrix
+       real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_DVR(:)
+       real(f8), allocatable :: kinZ_IALR(:), kinZ_IA(:), kinZ_I(:), kin_r(:)
+       real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_r(:,:)
+!> Vabs grids and value
+        real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
+        real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
+!> Product channel grids
+        real(f8), allocatable :: rp1(:)
+        real(f8), allocatable :: rp2(:)
 
     type(initWP_class) :: initWP
     type(IALR_class) :: IALR 
@@ -92,13 +98,13 @@ module gPara
 
     namelist /task/ reactChannel, IF_inelastic, Atoms, nPES, energyUnit, potentialType, outfile
     namelist /energy/ E_range, dE
-    namelist /initWP/ initWP
-    namelist /IALR/ IALR
-    namelist /Vabs/ Vabs
+    namelist /initWavePacket/ initWP
+    namelist /IALRset/ IALR
+    namelist /VabsAndDump/ Vabs
     namelist /propagation/ T_tot, timeStep, timePrint
     namelist /inelastic/ ine
-    namelist /channel1/ channel1
-    namelist /channel2/ channel2
+    namelist /productChannel1/ channel1
+    namelist /productChannel2/ channel2
 
 
 contains
@@ -112,15 +118,18 @@ contains
 
         open(unit=inpFileUnit, file="ABC.inf", status='old')
         read(inpFileUnit, nml=task) 
-        read(inpFileUnit, nml=energy) 
-        read(inpFileUnit, nml=initWP)
-        read(inpFileUnit, nml=IALR)
-        read(inpFileUnit, nml=Vabs)
+        read(inpFileUnit, nml=initWavePacket)
+        read(inpFileUnit, nml=IALRset)
         read(inpFileUnit, nml=propagation)
-        read(inpFileUnit, nml=channel1)
+        read(inpFileUnit, nml=energy) 
+        read(inpFileUnit, nml=VabsAndDump)
+        read(inpFileUnit, nml=productChannel1)
 
-        if (reactChannel == 2) read(inpFileUnit, nml=channel2)
-        if (IF_inelastic == 0) read(inpFileUnit, nml=inelastic) 
+        rewind(inpFileUnit)
+
+        if (reactChannel == 2) read(inpFileUnit, nml=productChannel2)
+        rewind(inpFileUnit)
+        if (IF_inelastic) read(inpFileUnit, nml=inelastic) 
 
         close(inpFileUnit)
         
@@ -163,29 +172,26 @@ contains
 !>  VAbs: Z3 = Zabs_asy_end, Z4 = Zabs_lr_end
 
 !> Allocate IALR DVR grids, kinetic energy and transMatrix
-        allocate(IALR%Z_IALR(IALR%nZ_IALR))
-        allocate(IALR%Z_IA(IALR%nZ_IA))
-        allocate(IALR%Z_I(IALR%nZ_I))
-        allocate(IALR%kinZ_IALR(IALR%nZ_IALR))
-        allocate(IALR%kinZ_IA(IALR%nZ_IA))
-        allocate(IALR%kinZ_I(IALR%nZ_I))
-        allocate(IALR%BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
-        allocate(IALR%BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
-        allocate(IALR%BZ_I(IALR%nZ_I, IALR%nZ_I))
-        allocate(IALR%r_DVR(IALR%nr_DVR))
-        allocate(IALR%kin_r(IALR%nr_DVR))
-        allocate(IALR%B_r(IALR%nr_DVR, IALR%nr_DVR))
-!> Allocate Vabs grids and Vabs
-        allocate(Vabs%Zasy(Vabs%nZasy), Vabs%ZLr(Vabs%nZlr), Vabs%rabs(Vabs%nZint))
-        allocate(Vabs%Fasy(Vabs%nZasy), Vabs%Flr(Vabs%nZlr), Vabs%Fabs(Vabs%nZint))
+        allocate(Z_IALR(IALR%nZ_IALR))
+        allocate(Z_IA(IALR%nZ_IA))
+        allocate(Z_I(IALR%nZ_I))
+        allocate(kinZ_IALR(IALR%nZ_IALR))
+        allocate(kinZ_IA(IALR%nZ_IA))
+        allocate(kinZ_I(IALR%nZ_I))
+        allocate(BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
+        allocate(BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
+        allocate(BZ_I(IALR%nZ_I, IALR%nZ_I))
+        allocate(r_DVR(IALR%nr_DVR))
+        allocate(kin_r(IALR%nr_DVR))
+        allocate(B_r(IALR%nr_DVR, IALR%nr_DVR))
 !> Allocate channel rp grids
-        allocate(channel1%rp(channel1%nrp))
-        if (reactChannel == 2) allocate(channel2%rp(channel2%nrp))
+        allocate(rp1(channel1%nrp))
+        if (reactChannel == 2) allocate(rp2(channel2%nrp))
 
 !> ========== Output ==========
 
         write(outFileUnit,'(1x,a)') " ========== Input Parameters =========="
-        write(outFileUnit,'(1x,a,a,a)') "Atoms A-B-C: ", Atoms(1), Atoms(2), Atoms(3)
+        write(outFileUnit,'(1x,a,a,a,a)') "Atoms A, B, C: ", Atoms(1), Atoms(2), Atoms(3)
         write(outFileUnit,'(1x,a,2i4)') "v0, j0 = ", initWP%v0, initWP%j0
         write(outFileUnit,'(1x,a,i4)') "Total angular momentum Jtot = ", initWP%Jtot
         write(outFileUnit,'(1x,a,i4)') "Total parity = ", initWP%tpar
@@ -199,7 +205,7 @@ contains
         implicit none
         integer, parameter :: nSupportedElements = 10
         character(len=2), parameter :: elemSymbol(nSupportedElements) = &
-            ['H ', 'D', 'He', 'Li', 'N ', 'O ', 'F ', 'S', 'Cl', 'Ar']
+            ['H ', 'D ', 'He', 'Li', 'N ', 'O ', 'F ', 'S ', 'Cl', 'Ar']
         real(f8), parameter :: elemMass(nSupportedElements) = &
             [1.00782503223_f8, 2.01410177812_f8, 4.002602_f8, 6.938_f8, 14.00307400443_f8, &
              15.99491461957_f8, 18.99840316273_f8, 32.06_f8, 34.968852682_f8, 39.9623831237_f8]
@@ -207,7 +213,7 @@ contains
         integer :: iatm, ipos
 
         do iatm = 1, 3 
-            ipos = findloc(elemSymbol, Atoms(iatm))
+            ipos = findloc(elemSymbol, Atoms(iatm), dim=1)
             if (ipos == 0) then
                 write(outFileUnit,*) "Error: Unsupported element ", Atoms(iatm)
                 write(outFileUnit,*) "POSITION: globalPara.f90, subroutine getMass()"
