@@ -27,16 +27,16 @@
 
 ! Parameters for IALR
 &IALRset
-   IALR%Z_range             = 1.0, 3000.0                ! Z grid range (I+A+lr)
-   IALR%nZ_IALR             = 29999                      ! Number of Z grid points (I+A+lr)
-   IALR%nZ_IA               = 799                        ! Number of Z grid points for asymptotic + interaction region
-   IALR%nZ_I                = 49                         ! Number of Z grid points for interaction region
-   IALR%r_range             = 0.4, 6.0                   ! r grid range
-   IALR%nr_DVR              = 300                        ! Number of r grid points for DVR   
-   IALR%vint                = 15                         ! Number of v for interaction region
-   IALR%jint                = 20                         ! Number of j for interaction region
-   IALR%vasy                = 10                         ! Number of v for asymptotic region
-   IALR%jasy                = 20                         ! Number of j for asymptotic region
+    IALR%Z_range             = 1.0, 3000.0                ! Z grid range (I+A+lr)
+    IALR%nZ_IALR             = 29999                      ! Number of Z grid points (I+A+lr)
+    IALR%nZ_IA               = 799                        ! Number of Z grid points for asymptotic + interaction region
+    IALR%nZ_I                = 49                         ! Number of Z grid points for interaction region
+    IALR%r_range             = 0.4, 6.0                   ! r grid range
+    IALR%nr_DVR              = 300                        ! Number of r grid points for DVR   
+    IALR%vint                = 15                         ! Number of v for interaction region
+    IALR%jint                = 20                         ! Number of j for interaction region
+    IALR%vasy                = 10                         ! Number of v for asymptotic region
+    IALR%jasy                = 20                         ! Number of j for asymptotic region
 /
 
 ! Parameters for propagation
