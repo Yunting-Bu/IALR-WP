@@ -32,7 +32,7 @@
     IALR%nZ_IA               = 799                        ! Number of Z grid points for asymptotic + interaction region
     IALR%nZ_I                = 49                         ! Number of Z grid points for interaction region
     IALR%r_range             = 0.4, 6.0                   ! r grid range
-    IALR%nr_DVR              = 300                        ! Number of r grid points for DVR   
+    IALR%nr_PODVR            = 3                          ! Number of r grid points for PODVR
     IALR%vint                = 15                         ! Number of v for interaction region
     IALR%jint                = 20                         ! Number of j for interaction region
     IALR%vasy                = 10                         ! Number of v for asymptotic region

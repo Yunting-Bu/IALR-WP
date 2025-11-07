@@ -28,7 +28,7 @@ module gPara
     end type initWP_class
 
     type :: IALR_class
-       integer :: nZ_IALR, nZ_IA, nZ_I, nr_DVR 
+       integer :: nZ_IALR, nZ_IA, nZ_I, nr_PODVR 
        integer :: vint, jint, vasy, jasy 
        real(f8) :: Z_range(2), r_range(2)
     end type IALR_class
@@ -81,9 +81,17 @@ module gPara
 !> LR - long range region
 !> kin for Kinetic energy of 1D box 
 !> B for DVR-FBR transformation matrix
-    real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_DVR(:)
-    real(f8), allocatable :: kinZ_IALR, kinZ_IA, kinZ_I, kin_r
-    real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_r(:,:)
+    real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_All(:), r_Asy(:)
+    real(f8), allocatable :: kinZ_IALR, kinZ_IA, kinZ_I, kin_rAll, kin_rAsy
+    real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rAll(:,:), B_rAsy(:,:)
+    real(f8), allocatable :: rPOGrid(:)
+!> Grids and weights for K independent Gauss-Legendre quadrature
+    real(f8), allocatable :: asyANode(:), asyAWeight(:)
+!> Vib-rotational basis of BC in asymptotic range
+    real(f8), allocatable :: asyWFvjK(:,:,:)
+    real(f8), allocatable :: BCAtDMat(:,:)
+    real(f8), allocatable :: BCEvj(:,:)
+    real(f8), allocatable :: BCPOWF(:,:,:)
 !> Vabs grids and value
     real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
     real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
@@ -113,6 +121,7 @@ module gPara
 
 contains
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine initPara()
         implicit none
         integer :: iEtot, inpFileUnit
@@ -164,26 +173,21 @@ contains
             stop
         end if
 
+        if (initWP%tpar /= (-1)**(initWP%Jtot+initWP%j0+initWP%l0)) then 
+            write(outFileUnit,*) "Error: total pairty incoorent with l0."
+            write(outFileUnit,*) "POSITION: globalPara.f90, subroutine initPara()"
+            stop
+        end if
+
+        if (initWP%l0 > initWP%j0+initWP%Jtot) then 
+            write(outFileUnit,*) "Error: l0 > Jtot + j0."
+            write(outFileUnit,*) "POSITION: globalPara.f90, subroutine initPara()"
+            stop
+        end if
+
         call getMass()
         call diatomParity()
 
-!> Interaction-Asympotic-Lonng-Range (IALR) range
-!>  |----|
-!>  |----|----|
-!>  |----|----|----|
-!>  |----|----|----|
-!>  Z1   Z2   Z3   Z4
-!>  VAbs: Z3 = Zabs_asy_end, Z4 = Zabs_lr_end
-
-!> Allocate IALR DVR grids, kinetic energy and transMatrix
-        allocate(Z_IALR(IALR%nZ_IALR))
-        allocate(Z_IA(IALR%nZ_IA))
-        allocate(Z_I(IALR%nZ_I))
-        allocate(BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
-        allocate(BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
-        allocate(BZ_I(IALR%nZ_I, IALR%nZ_I))
-        allocate(r_DVR(IALR%nr_DVR))
-        allocate(B_r(IALR%nr_DVR, IALR%nr_DVR))
 !> Allocate channel rp grids
         allocate(rp1(channel1%nrp))
         if (reactChannel == 2) allocate(rp2(channel2%nrp))
@@ -204,7 +208,9 @@ contains
 
 
     end subroutine initPara
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine getMass()
         implicit none
         integer, parameter :: nSupportedElements = 10
@@ -233,7 +239,9 @@ contains
         massTot = atomMass(1)*(atomMass(2)+atomMass(3))/(atomMass(1)+atomMass(2)+atomMass(3))
 
     end subroutine getMass
+!> ------------------------------------------------------------------------------------------------------------------ <!
     
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine diatomParity()
         implicit none
         !> jpar = -1, 0, 1, jmin = 1, 0, 0, jinc = 2, 0, 2
@@ -279,5 +287,6 @@ contains
         end if
 
     end subroutine diatomParity
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
 end module gPara

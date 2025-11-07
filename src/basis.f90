@@ -1,10 +1,15 @@
 module basisMod
-    use machina_basic , only : f8
+    use machina_basic, only : f8
     use gPara
+    use potentMod
     implicit none
+    public
+
+    private :: setChannel
    
 contains
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine DVR_Grid(nGrid, rMin, rMax, Grid)
         implicit none
         integer, intent(in) :: nGrid
@@ -16,7 +21,9 @@ contains
             Grid(i) = rMin + i*(rMax - rMin)/(nGrid + 1)
         end do
     end subroutine DVR_Grid
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine DVR_TransMatAndKinetic(range, nGrid, mass, Kinetic, TransMat)
         implicit none
         real(f8), intent(in) :: range
@@ -35,17 +42,40 @@ contains
             end do
         end do
     end subroutine DVR_TransMatAndKinetic
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine DVR_IALR()
         implicit none
-        real(f8) :: range_IALR, range_IA, range_I, range_r
+        real(f8) :: range_IALR, range_IA, range_I, range_r, range_rA
         real(f8) :: dR
+
+!> Interaction-Asympotic-Lonng-Range (IALR) range
+!> r3   |----|
+!> r2   |----|----|
+!>      |----|----|----|
+!> r1   |----|----|----|
+!>      Z1   Z2   Z3   Z4
+!>  nDVR in range [r1, r3] = vint, nDVR in range [r1, r2] = vasy 
+!>  VAbs: Z3 = Zabs_asy_end, Z4 = Zabs_lr_end
+
+!> Allocate IALR DVR grids, kinetic energy and transMatrix
+        allocate(Z_IALR(IALR%nZ_IALR))
+        allocate(Z_IA(IALR%nZ_IA))
+        allocate(Z_I(IALR%nZ_I))
+        allocate(BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
+        allocate(BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
+        allocate(BZ_I(IALR%nZ_I, IALR%nZ_I))
+        allocate(r_Asy(IALR%vasy), r_All(IALR%vint))
+        allocate(B_rAll(IALR%vint, IALR%vint))
+        allocate(B_rAsy(IALR%vasy, IALR%vasy))
 
         range_IALR = IALR%Z_range(2) - IALR%Z_range(1)
         dR = range_IALR / real(IALR%nZ_IALR + 1, f8)
         call DVR_Grid(IALR%nZ_IALR, IALR%Z_range(1), IALR%Z_range(2), Z_IALR)
         call DVR_TransMatAndKinetic(range_IALR, IALR%nZ_IALR, massTot, kinZ_IALR, BZ_IALR)
 
+!> ======== DVR calculate =========
         range_IA = dR * (IALR%nZ_IA + 1)
         call DVR_TransMatAndKinetic(range_IA, IALR%nZ_IA, massTot, kinZ_IA, BZ_IA)
 
@@ -53,11 +83,108 @@ contains
         call DVR_TransMatAndKinetic(range_I, IALR%nZ_I, massTot, kinZ_I, BZ_I)
 
         range_r = IALR%r_range(2) - IALR%r_range(1)
-        call DVR_Grid(IALR%nr_DVR, IALR%r_range(1), IALR%r_range(2), r_DVR)
-        call DVR_TransMatAndKinetic(range_r, IALR%nr_DVR, massBC, kin_r, B_r)
+        dR = range_r / real(IALR%vint + 1, f8)
+        call DVR_Grid(IALR%vasy, IALR%r_range(1), IALR%r_range(2), r_All)
+        call DVR_TransMatAndKinetic(range_r, IALR%vint, massBC, kin_rAll, B_rAll)
+
+        range_rA = dR * (IALR%vasy + 1)
+        call DVR_TransMatAndKinetic(range_rA, IALR%vasy, massBC, kin_rAsy, B_rAsy)
+        r_Asy(:) = r_All(1:IALR%vasy)
 
     end subroutine DVR_IALR
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine BCasy_vibRotThetaWF()
+        implicit none
+        real(f8), parameter :: longDis = 30.0_f8
+        real(f8) :: bond(3), AtDMat(nPES,nPES), Vadia(nPES)
+        real(f8), allocatable :: adiaV(:,:)
+        real(f8), allocatable :: DVREig(:)
+        real(f8), allocatable :: DVRWF(:,:)
+        real(f8) :: wA, cth, YjK
+        real(f8), external :: spgndr
+        integer :: ir, v, j, K, i, ith
+
+!> Allocate asympotic range angular quadrature grids and weights
+        allocate(asyANode(IALR%jasy))
+        allocate(asyAWeight(IALR%jasy))
+!> Allocate wave function
+        allocate(asyWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
+!> Channel set as (v,j,K)
+        call setChannel()
+        call getANodeAndWeight(initWP%jpar, jasy, asyANode, asyAWeight)
+
+!> Allocate PODVR array
+        allocate(adiaV(nPES,IALR%vasy))
+        allocate(DVREig(IALR%vasy), DVRWF(IALR%vasy,IALR%vasy))
+        allocate(BCAtDMat(nPES,IALR%vasy))
+        allocate(BCEvj(0:IALR%vasy,0:IALR%jasy))
+        allocate(rPOGrid(IALR%nr_PODVR))
+        allocate(BCPOWF(IALR%nr_PODVR,0:IALR%vasy,0:IALR%jasy))
+
+!> In this situation, bond(2) is the length of BC
+!> You should check the PES interface!
+        bond(1) = longDis
+        bond(3) = longDis
+        do ir = 1, IALR%vasy
+            bond(2) = r_Asy(ir)
+            call diagDiaVmat(bond,AtDMat,Vadia)
+            BCAtDMat(:,ir) = AtDMat(:)
+            adiaV(:,ir) = Vadia
+        end do 
+        call DVR_calc(IALR%vasy,kin_rAsy,adiaV,DVREig,DVRWF)
+        call PODVR(IALR%nr_PODVR,IALR%vasy,DVRWF,r_Asy,DVREig,IALR%vasy,IALR%jasy,massBC,rPOGrid,BCPOWF,BCEvj)
+
+        do i = 1, nChannels
+            v = qn_channel(i,1)
+            j = qn_channel(i,2)
+            K = qn_channel(i,3)
+            do ith = 1, IALR%jasy
+                cth = asyANode(ith)
+                wA = dsqrt(asyAWeight(ith))
+                YjK = spgndr(j,K,cth)
+                asyWFvjK(i,:,ith) = wA*YjK*BCPOWF(:,v,j)
+            end do 
+        end do
+
+    end subroutine BCasy_vibRotThetaWF
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine getANodeAndWeight(jpar, nth, nodes, weights)
+        implicit none
+        integer, intent(in) :: jpar, nth
+        real(f8), intent(inout) :: nodes(:), weights(:)
+        integer :: i, ntmp 
+
+!> Take advantage of the symmetry of potential the grid used for angle could be used half.
+        if (jpar /= 0) then 
+            ntmp = 2*nth 
+        else
+            ntmp = nth 
+        end if 
+
+!> First call ntmp = 2*nth for the system has symmetry.
+        block 
+            real(f8) :: tmpNode(ntmp), tmpWeight(ntmp)
+            
+            call GAULEG(-1.0_f8, 1.0_f8, tmpNode, tmpWeight, ntmp)
+!> Take half of grid
+            do i = 1, nth 
+                nodes(i) = tmpNode(i)
+                if (jpar /= 0) then
+                    weights(i) = 2.0_f8*tmpWeight(i)
+                else 
+                    weights(i) = tmpWeight(i)
+                end if 
+            end do 
+        end block
+
+    end subroutine getANodeAndWeight
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine setChannel()
         implicit none
         integer :: ichnl, v, j, K, Kmax
@@ -88,7 +215,9 @@ contains
         end do
 
     end subroutine setChannel
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine DVR_calc(nDVR, kinetic, Vdiatom, eigVal, eigVec)
 !> Calculate the DVR eigenvalues and eigenvectors for a given diatomic potential
 !> See J. Chem. Phys. Vol. 96 (3), 1 Feb 1992, pp 1982-1991
@@ -139,7 +268,9 @@ contains
         end associate
 
     end subroutine DVR_calc
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, vmax, jmax, mass, POGrid, POWF, Evj)
 !> Calculate the PODVR basis and eigenvalues/eigenfunctions for given DVR basis
 !> See Chemical Physics Letters 1992, 190 (3–4), 225–230.
@@ -209,7 +340,7 @@ contains
         block 
             real(f8) :: tmp 
             integer :: qn_j, qn_v
-!> HRef(i,j) = Sum_l Xmat(l,i) * DvrEig(l) * Xmat(l,j)
+!> HRef(i,j) = Sum_l Xmat(l,i) * DVREig(l) * Xmat(l,j)
             HRefMat = 0.0_f8
             do i = 1, nPODVR
                 do j = 1, i 
@@ -257,7 +388,9 @@ contains
             end do
         end block
     end subroutine PODVR
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine phaseTrans(n, vec)
         implicit none
         integer, intent(in) :: n
@@ -283,6 +416,7 @@ contains
         end if
 
     end subroutine phaseTrans
+!> ------------------------------------------------------------------------------------------------------------------ <!
 
     
 end module basisMod
