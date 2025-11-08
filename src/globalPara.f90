@@ -76,6 +76,7 @@ module gPara
 !> Channels
     integer :: nChannels
     integer, allocatable :: qn_channel(:,:)
+    integer, allocatable :: seq_channel(:,:,:)
 !> I - interaction region
 !> A - asymptotic region
 !> LR - long range region
@@ -84,14 +85,20 @@ module gPara
     real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_All(:), r_Asy(:)
     real(f8), allocatable :: kinZ_IALR, kinZ_IA, kinZ_I, kin_rAll, kin_rAsy
     real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rAll(:,:), B_rAsy(:,:)
-    real(f8), allocatable :: rPOGrid(:)
+    real(f8), allocatable :: r_PODVR(:)
 !> Grids and weights for K independent Gauss-Legendre quadrature
     real(f8), allocatable :: asyANode(:), asyAWeight(:)
-!> Vib-rotational basis of BC in asymptotic range
+!> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in asymptotic range
     real(f8), allocatable :: asyWFvjK(:,:,:)
-    real(f8), allocatable :: BCAtDMat(:,:)
-    real(f8), allocatable :: BCEvj(:,:)
-    real(f8), allocatable :: BCPOWF(:,:,:)
+    real(f8), allocatable :: asyBC_Evj(:,:)
+    real(f8), allocatable :: asyBC_POWF(:,:,:)
+!> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in long-range
+!> Only have one state (v0, j0)
+    real(f8) :: lrBC_Evj
+    real(f8), allocatable :: lrWFvjK(:,:)
+    real(f8), allocatable :: lrBC_POWF(:,:)
+!> SF to BF transMat
+    real(f8), allocatable :: SF2BFMat(:,:)
 !> Vabs grids and value
     real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
     real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
@@ -185,6 +192,12 @@ contains
             stop
         end if
 
+        if (initWP%l0 < abs(initWP%j0-initWP%Jtot)) then 
+            write(outFileUnit,*) "Error: l0 < |Jtot - j0|."
+            write(outFileUnit,*) "POSITION: globalPara.f90, subroutine initPara()"
+            stop
+        end if
+
         call getMass()
         call diatomParity()
 
@@ -196,7 +209,7 @@ contains
 
         write(outFileUnit,'(1x,a)') " ========== Input Parameters =========="
         write(outFileUnit,'(1x,a,a,a)') "Reaction Channel: ", &
-            merge("A + BC -> AB + C", "A + BC -> AB + C and AC + B", reactChannel==1)
+            merge("A + BC -> AB + C           ", "A + BC -> AB + C and AC + B", reactChannel==1)
         write(outFileUnit,'(1x,a,a,a,a)') "Atoms A, B, C: ", Atoms(1), Atoms(2), Atoms(3)
         write(outFileUnit,'(1x,a,f15.9)') "Reduced Masses of BC (a.u.):", massBC
         write(outFileUnit,'(1x,a,f15.9)') "Reduced Masses of ABC (a.u.):", massTot
