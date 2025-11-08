@@ -73,6 +73,9 @@ module gPara
     character(len=3) :: potentialType
     character(len=50) :: outfile
     logical :: IF_inelastic
+!> Flux
+    character(len=1) :: IDflux 
+    real(f8) :: fluxPos
 !> Channels
     integer :: nChannels
     integer, allocatable :: qn_channel(:,:)
@@ -97,8 +100,9 @@ module gPara
     real(f8) :: lrBC_Evj
     real(f8), allocatable :: lrWFvjK(:,:)
     real(f8), allocatable :: lrBC_POWF(:,:)
-!> SF to BF transMat
-    real(f8), allocatable :: SF2BFMat(:,:)
+!> Initial Gaussian-shape WP and initial total WP
+    complex(c8), allocatable :: initGaussWP(:)
+    complex(c8), allocatable :: initTotWP(:,:,:,:,:)
 !> Vabs grids and value
     real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
     real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
@@ -115,7 +119,7 @@ module gPara
 
 !> ========== Namelists ==========
 
-    namelist /task/ reactChannel, IF_inelastic, Atoms, nPES, energyUnit, potentialType, outfile
+    namelist /task/ reactChannel, IF_inelastic, IDflux, fluxPos, Atoms, nPES, energyUnit, potentialType, outfile
     namelist /energy/ E_range, dE
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR

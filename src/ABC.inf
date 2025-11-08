@@ -3,10 +3,12 @@
 ! Task types for the calculation
 &task
     reactChannel       = 2                          ! Number of reactive channels
-    IF_inelastic       = .true.                         ! Inelastic calculation flag  
+    IF_inelastic       = .true.                     ! Inelastic calculation flag  
     Atoms              = 'O', 'O', 'H'              ! Atoms, A B C order 
     nPES               = 2                          ! Number of PESs
     energyUnit         = 1                          ! Energy unit: 1 for cm-1, 2 for eV, 3 for Kelvin, 4 for Hartree
+    IDflux             = 'Z'                        ! Flux analysis at which channel, 'r' for product and 'Z' for reactant, 'N' for no flux 
+    fluxPos            = 20.0                       ! Where analysis flux
     potentialType      = 'New'                      ! Potential type: Read or New
     outfile            = 'OOH'                      ! Output file name (.out, don't need to add extension)
 /    

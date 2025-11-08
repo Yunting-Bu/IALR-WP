@@ -5,7 +5,7 @@ module basisMod
     implicit none
     public
 
-    private :: setChannel
+    private :: setChannel, asyBC_vibRotThetaWF
    
 contains
 
@@ -150,7 +150,7 @@ contains
         write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2cm, ' cm-1.'
         write(outFileUnit,'(1x,a)') 'Please check the energy!'
         write(outFileUnit,*) ''
-        write(outFileUnit,'(1x,a,f15.0)') 'Initial ro-vibrational wave function normalize check: ', normWF
+        write(outFileUnit,'(1x,a,f15.0)') 'Initial ro-vibrational wave function normalization check: ', normWF
         write(outFileUnit,'(1x,a)') '==================================================================================='
 
         do i = 1, nChannels
@@ -172,6 +172,9 @@ contains
     subroutine lrBC_vibRotThetaWF()
         implicit none
         integer :: ichnl, K, Kmax, nchnl 
+
+!> The long range WF is based on asyWF
+        call asyBC_vibRotThetaWF()
         
         allocate(lrBC_POWF(IALR%nr_PODVR))
 

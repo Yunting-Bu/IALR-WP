@@ -6,6 +6,52 @@ module potentMod
 contains
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine Jacobi2Bond(Z, r, theta, massB, massC, bond)
+        implicit none
+        real(f8), intent(in) :: Z, r, theta 
+        real(f8), intent(in) :: massB, massC 
+        real(f8), intent(out) :: bond(3)
+        real(f8) :: rOB, rOC, th
+
+!> bond(1) = rAB, bond(2) = rBC, bond(3) = rAC
+!> theta in degree
+        bond(2) = r
+        th = theta * pi / 180.0_f8
+        rOB = massC / (massB+massC) * r 
+        rOC = massB / (massB+massC) * r 
+        bond(1) = dsqrt(Z*Z+rOB*rOB-2.0_f8*Z*rOB*dcos(th))
+        bond(3) = dsqrt(Z*Z+rOC*rOC+2.0_f8*Z*rOC*dcos(th))
+
+    end subroutine Jacobi2Bond
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine bond2Jacobi(bond, Z, r, theta, massB, massC)
+        implicit none
+        real(f8), intent(in) :: bond(3)
+        real(f8), intent(in) :: massB, massC 
+        real(f8), intent(out) :: Z, r, theta 
+        real(f8) :: r1, r2, a1, a2
+
+!> theta in degree
+        r = bond(2)
+        r1 = massB * r / (massB+massC)
+        r2 = massC * r / (massB+massC)
+
+        a1 = (bobd(1)**2+r**2-bond(3)**2) / (2.0_f8*r*bond(1))
+        Z = dsqrt(bond(1)**2+r1**2-2.0_f8*r1*bond(1)*a1)
+        a2 = (Z**2+r2**2-bond(3)**2) / (2.0_f8*r2*Z)
+
+        if (a2 > 1.0_f8) a2 = 1.0_f8
+        if (a2 < -1.0_f8) a2 = -1.0_f8
+        theta = dacos(a2) * 180.0_f8 / pi 
+        if (Z == 0.0_f8) theta = 90.0_f8
+    
+    end subroutine bond2Jacobi
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine diagDiaVmat(bond, AtDMat, adiaV)
         implicit none
         real(f8), intent(in) :: bond(3)
@@ -41,6 +87,5 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    !subroutine phaseTransAtD(AtDMat, adiaV, )
     
 end module potentMod
