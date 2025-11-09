@@ -24,16 +24,13 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine DVR_TransMatAndKinetic(range, nGrid, mass, Kinetic, TransMat)
+    subroutine DVR_TransMat(range, nGrid, TransMat)
         implicit none
         real(f8), intent(in) :: range
         integer, intent(in) :: nGrid
-        real(f8), intent(in) :: mass
-        real(f8), intent(inout) :: Kinetic, TransMat(:,:)
+        real(f8), intent(inout) :: TransMat(:,:)
         integer :: i, j
         real(f8) :: fact 
-
-        Kinetic = pi*pi/(4.0_f8*mass*range*range)
 
         fact = dsqrt(2.0_f8/(nGrid + 1))
         do i = 1, nGrid
@@ -42,7 +39,7 @@ contains
                 TransMat(j,i) = TransMat(i,j)
             end do
         end do
-    end subroutine DVR_TransMatAndKinetic
+    end subroutine DVR_TransMat
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -75,21 +72,21 @@ contains
         range_IALR = IALR%Z_range(2) - IALR%Z_range(1)
         dR = range_IALR / real(IALR%nZ_IALR + 1, f8)
         call DVR_Grid(IALR%nZ_IALR, IALR%Z_range(1), IALR%Z_range(2), Z_IALR)
-        call DVR_TransMatAndKinetic(range_IALR, IALR%nZ_IALR, massTot, kinZ_IALR, BZ_IALR)
+        call DVR_TransMat(range_IALR, IALR%nZ_IALR, BZ_IALR)
 
         range_IA = dR * (IALR%nZ_IA + 1)
-        call DVR_TransMatAndKinetic(range_IA, IALR%nZ_IA, massTot, kinZ_IA, BZ_IA)
+        call DVR_TransMat(range_IA, IALR%nZ_IA, BZ_IA)
 
         range_I = dR * (IALR%nZ_I + 1)
-        call DVR_TransMatAndKinetic(range_I, IALR%nZ_I, massTot, kinZ_I, BZ_I)
+        call DVR_TransMat(range_I, IALR%nZ_I, BZ_I)
 
         range_r = IALR%r_range(2) - IALR%r_range(1)
         dR = range_r / real(IALR%vint + 1, f8)
-        call DVR_Grid(IALR%vasy, IALR%r_range(1), IALR%r_range(2), r_All)
-        call DVR_TransMatAndKinetic(range_r, IALR%vint, massBC, kin_rAll, B_rAll)
+        call DVR_Grid(IALR%vint, IALR%r_range(1), IALR%r_range(2), r_All)
+        call DVR_TransMat(range_r, IALR%vint, B_rAll)
 
         range_rA = dR * (IALR%vasy + 1)
-        call DVR_TransMatAndKinetic(range_rA, IALR%vasy, massBC, kin_rAsy, B_rAsy)
+        call DVR_TransMat(range_rA, IALR%vasy, B_rAsy)
         r_Asy(:) = r_All(1:IALR%vasy)
 
     end subroutine DVR_IALR
@@ -112,10 +109,10 @@ contains
 !> Allocate asympotic range angular quadrature grids and weights
         allocate(asyANode(IALR%jasy))
         allocate(asyAWeight(IALR%jasy))
-!> Allocate wave function
-        allocate(asyWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
 !> Channel set as (v,j,K)
         call setChannel()
+!> Allocate wave function
+        allocate(asyWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
         call getANodeAndWeight(initWP%jpar, IALR%jasy, asyANode, asyAWeight)
 
 !> Allocate PODVR array
@@ -134,23 +131,23 @@ contains
             bond(2) = r_Asy(ir)
             call diagDiaVmat(bond,AtDMat,Vadia)
             asyBC_AtDMat(:,:,ir) = AtDMat(:,:)
-            adiaV(:,ir) = Vadia
+            adiaV(:,ir) = Vadia(:)
         end do 
-        call DVR_calc(IALR%vasy,kin_rAsy,adiaV,DVREig,DVRWF)
+        call DVR_calc(IALR%vasy,massBC,r_Asy,adiaV,DVREig,DVRWF)
         call PODVR(IALR%nr_PODVR,IALR%vasy,DVRWF,r_Asy,DVREig,IALR%vasy,IALR%jasy,massBC,r_PODVR,asyBC_POWF,asyBC_Evj)
 
         normWF = 0.0_f8
         do ir = 1, IALR%vasy 
-            normWF = normWF + asyBC_POWF(i,initWP%v0,initWP%j0)**2
+            normWF = normWF + asyBC_POWF(i,initWP%v0,initWP%j0)**2*(r_Asy(2)-r_Asy(1))
         end do 
 
         write(outFileUnit,'(1x,a)') '==================================================================================='
-        write(outFileUnit,'(1x,a,2i,a)') 'Initial ro-vibrational energy of (v0, j0) = ', initWP%v0, initWP%j0, ' state.'
+        write(outFileUnit,'(1x,a,2i2,a)') 'Initial ro-vibrational energy of (v0, j0) = ', initWP%v0, initWP%j0, ' state.'
         write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2ev, ' eV.'
         write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2cm, ' cm-1.'
         write(outFileUnit,'(1x,a)') 'Please check the energy!'
         write(outFileUnit,*) ''
-        write(outFileUnit,'(1x,a,f15.0)') 'Initial ro-vibrational wave function normalization check: ', normWF
+        write(outFileUnit,'(1x,a,f15.9)') 'Initial ro-vibrational wave function normalization check: ', normWF
         write(outFileUnit,'(1x,a)') '==================================================================================='
 
         do i = 1, nChannels
@@ -271,12 +268,13 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine DVR_calc(nDVR, kinetic, Vdiatom, eigVal, eigVec)
+    subroutine DVR_calc(nDVR, mass, Grid, Vdiatom, eigVal, eigVec)
 !> Calculate the DVR eigenvalues and eigenvectors for a given diatomic potential
 !> See J. Chem. Phys. Vol. 96 (3), 1 Feb 1992, pp 1982-1991
         implicit none
         integer, intent(in) :: nDVR
-        real(f8), intent(in) :: kinetic
+        real(f8), intent(in) :: mass
+        real(f8), intent(in) :: Grid(:)
 !> Vdiatom: nPES x nDVR
         real(f8), intent(in) :: Vdiatom(:,:)
 !> Only calculate initPES vibrational states
@@ -284,18 +282,21 @@ contains
         real(f8), intent(inout) :: eigVec(:,:) 
         integer :: i, j, info, lwork
         real(f8), allocatable :: work(:)
+        real(f8) :: fact, range
 
         associate(n => nDVR, C => eigVec, V => Vdiatom)
+        range = Grid(n) - Grid(1)
 !> Since diagonal T matrix is C matrix
             do i = 1, n 
                 do j = 1, i-1
-                    C(i,j) = kinetic * &
-                             (dsin(pi * (i-j) / (2.0_f8 * (n+1)))**(-2) - &
-                             dsin(pi * (i+j) / (2.0_f8 * (n+1)))**(-2)) * (-1.0_f8) **(i-j)
+                    fact = pi*pi/(4.0_f8*mass*range*range)
+                    C(i,j) = fact  * &
+                             ((dsin(pi * (i-j) / (2.0_f8 * (n+1))))**(-2) - &
+                             (dsin(pi * (i+j) / (2.0_f8 * (n+1))))**(-2)) * (-1.0_f8) **(i-j)
                 end do
-                C(i,i) = kinetic * &
+                C(i,i) = fact * &
                          ((2.0_f8 * (n+1)**2 +1.0_f8) / 3.0_f8 - &
-                         dsin(pi * i / (n+1))**(-2)) + V(initWP%initPES,i)
+                         (dsin(pi * i / (n+1)))**(-2)) + V(initWP%initPES,i)
             end do 
             do i = 1, n
                 do j = i+1, n

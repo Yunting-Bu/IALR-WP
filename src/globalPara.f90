@@ -83,9 +83,7 @@ module gPara
 !> I - interaction region
 !> A - asymptotic region
 !> LR - long range region
-!> kin for Kinetic energy of 1D box 
 !> B for DVR-FBR transformation matrix
-    real(f8) :: kinZ_IALR, kinZ_IA, kinZ_I, kin_rAll, kin_rAsy
     real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_All(:), r_Asy(:)
     real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rAll(:,:), B_rAsy(:,:)
     real(f8), allocatable :: r_PODVR(:)

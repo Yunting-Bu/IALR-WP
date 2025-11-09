@@ -79,6 +79,7 @@ contains
             deallocate(work)
         else 
             AtDMat = 1.0_f8
+            adiaV(1) = diaV(1,1)
         end if 
     
     end subroutine diagDiaVmat
