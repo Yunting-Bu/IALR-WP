@@ -1,5 +1,5 @@
 module initWPMod
-    use machina_basic, only :: f8, c8 
+    use machina_basic, only : f8, c8 
     use gPara
     use basisMod
     implicit none
@@ -42,12 +42,12 @@ contains
 !> Gaussian wave-packet in DVR representation
         normWP = 0.0_f8
         do iZ = 1, IALR%nZ_IALR
-            initGaussWP(iZ) = GaussianWavePacket(initWP%Ec,initWP%delta,initGaussWP%Zc,massTot,Z_IALR(iZ)) &
+            initGaussWP(iZ) = GaussianWavePacket(initWP%Ec,initWP%delta,initWP%Zc,massTot,Z_IALR(iZ)) &
                               * dsqrt(Z_IALR(2)-Z_IALR(1))
-            normWP = normWP + dabs(initGaussWP(iZ))**2
+            normWP = normWP + abs(initGaussWP(iZ))**2
         end do 
 
-        write(outFileUnit,'(1x,a,f15.0)') 'Initial Gaussian wave-packet normalization check: ', normWF
+        write(outFileUnit,'(1x,a,f15.0)') 'Initial Gaussian wave-packet normalization check: ', normWP
 
     end subroutine Z_initGaussWP
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -81,6 +81,8 @@ contains
                 end do 
             end do 
         end do
+
+        deallocate(BLK)
 
     end subroutine getAdiaInitTotWP
 !> ------------------------------------------------------------------------------------------------------------------ <!

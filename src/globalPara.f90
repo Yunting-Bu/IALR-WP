@@ -85,8 +85,8 @@ module gPara
 !> LR - long range region
 !> kin for Kinetic energy of 1D box 
 !> B for DVR-FBR transformation matrix
+    real(f8) :: kinZ_IALR, kinZ_IA, kinZ_I, kin_rAll, kin_rAsy
     real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_All(:), r_Asy(:)
-    real(f8), allocatable :: kinZ_IALR, kinZ_IA, kinZ_I, kin_rAll, kin_rAsy
     real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rAll(:,:), B_rAsy(:,:)
     real(f8), allocatable :: r_PODVR(:)
 !> Grids and weights for K independent Gauss-Legendre quadrature
@@ -98,8 +98,8 @@ module gPara
 !> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in long-range
 !> Only have one state (v0, j0)
     real(f8) :: lrBC_Evj
-    real(f8), allocatable :: lrWFvjK(:,:)
-    real(f8), allocatable :: lrBC_POWF(:,:)
+    real(f8), allocatable :: lrWFvjK(:,:,:)
+    real(f8), allocatable :: lrBC_POWF(:)
 !> Initial Gaussian-shape WP and initial total WP
     complex(c8), allocatable :: initGaussWP(:)
     complex(c8), allocatable :: initTotWP(:,:,:,:,:)
@@ -261,9 +261,9 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine diatomParity()
         implicit none
-        !> jpar = -1, 0, 1, jmin = 1, 0, 0, jinc = 2, 0, 2
+        !> jpar = -1, 0, 1, jmin = 1, 0, 0, jinc = 2, 1, 2
         integer :: jmin(-1:1) = [1, 0, 0]
-        integer :: jinc(-1:1) = [2, 0, 2]
+        integer :: jinc(-1:1) = [2, 1, 2]
         real(f8) :: eps 
         
         eps = 100.0_f8 * epsilon(atomMass(1))

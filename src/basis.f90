@@ -71,12 +71,12 @@ contains
         allocate(B_rAll(IALR%vint, IALR%vint))
         allocate(B_rAsy(IALR%vasy, IALR%vasy))
 
+!> ======== DVR calculate =========
         range_IALR = IALR%Z_range(2) - IALR%Z_range(1)
         dR = range_IALR / real(IALR%nZ_IALR + 1, f8)
         call DVR_Grid(IALR%nZ_IALR, IALR%Z_range(1), IALR%Z_range(2), Z_IALR)
         call DVR_TransMatAndKinetic(range_IALR, IALR%nZ_IALR, massTot, kinZ_IALR, BZ_IALR)
 
-!> ======== DVR calculate =========
         range_IA = dR * (IALR%nZ_IA + 1)
         call DVR_TransMatAndKinetic(range_IA, IALR%nZ_IA, massTot, kinZ_IA, BZ_IA)
 
@@ -103,7 +103,7 @@ contains
         real(f8), allocatable :: adiaV(:,:)
         real(f8), allocatable :: DVREig(:)
         real(f8), allocatable :: DVRWF(:,:)
-        real(f8), allocatable :: asyBC_AtDMat(:,:)
+        real(f8), allocatable :: asyBC_AtDMat(:,:,:)
         real(f8) :: wA, cth, YjK, normWF
         real(f8), external :: spgndr
         integer :: ir, v, j, K, i, ith
@@ -116,12 +116,12 @@ contains
         allocate(asyWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
 !> Channel set as (v,j,K)
         call setChannel()
-        call getANodeAndWeight(initWP%jpar, jasy, asyANode, asyAWeight)
+        call getANodeAndWeight(initWP%jpar, IALR%jasy, asyANode, asyAWeight)
 
 !> Allocate PODVR array
         allocate(adiaV(nPES,IALR%vasy))
         allocate(DVREig(IALR%vasy), DVRWF(IALR%vasy,IALR%vasy))
-        allocate(asyBC_AtDMat(nPES,IALR%vasy))
+        allocate(asyBC_AtDMat(nPES,nPES,IALR%vasy))
         allocate(asyBC_Evj(0:IALR%vasy,0:IALR%jasy))
         allocate(r_PODVR(IALR%nr_PODVR))
         allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%vasy,0:IALR%jasy))
@@ -133,7 +133,7 @@ contains
         do ir = 1, IALR%vasy
             bond(2) = r_Asy(ir)
             call diagDiaVmat(bond,AtDMat,Vadia)
-            asyBC_AtDMat(:,ir) = AtDMat(:)
+            asyBC_AtDMat(:,:,ir) = AtDMat(:,:)
             adiaV(:,ir) = Vadia
         end do 
         call DVR_calc(IALR%vasy,kin_rAsy,adiaV,DVREig,DVRWF)
@@ -164,6 +164,8 @@ contains
                 asyWFvjK(i,:,ith) = wA*YjK*asyBC_POWF(:,v,j)
             end do 
         end do
+
+        deallocate(adiaV, DVREig, DVRWF, asyBC_AtDMat)
 
     end subroutine asyBC_vibRotThetaWF
 !> ------------------------------------------------------------------------------------------------------------------ <!

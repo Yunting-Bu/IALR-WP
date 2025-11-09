@@ -1,5 +1,5 @@
 module potentMod
-    use machina_basic, only :: f8 
+    use machina_basic, only : f8 
     use gPara
     implicit none
     
@@ -38,7 +38,7 @@ contains
         r1 = massB * r / (massB+massC)
         r2 = massC * r / (massB+massC)
 
-        a1 = (bobd(1)**2+r**2-bond(3)**2) / (2.0_f8*r*bond(1))
+        a1 = (bond(1)**2+r**2-bond(3)**2) / (2.0_f8*r*bond(1))
         Z = dsqrt(bond(1)**2+r1**2-2.0_f8*r1*bond(1)*a1)
         a2 = (Z**2+r2**2-bond(3)**2) / (2.0_f8*r2*Z)
 
@@ -77,10 +77,8 @@ contains
                 stop
             end if
             deallocate(work)
-            adiaV = diaV 
         else 
             AtDMat = 1.0_f8
-            adiaV = diaV 
         end if 
     
     end subroutine diagDiaVmat
