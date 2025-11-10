@@ -60,7 +60,7 @@ module gPara
 
 !> Task types and propagation settings
     integer :: reactChannel, nPES, energyUnit
-    integer :: T_tot, timeStep, timePrint
+    integer :: timeTot, timeStep, timePrint
 !> Energy input
     integer :: nEtot, outFileUnit
     real(f8) :: E_range(2), dE
@@ -101,6 +101,7 @@ module gPara
 !> Initial Gaussian-shape WP and initial total WP
     complex(c8), allocatable :: initGaussWP(:)
     complex(c8), allocatable :: initTotWP(:,:,:,:,:)
+    real(f8), allocatable :: initWP_BLK(:,:)
 !> Vabs grids and value
     real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
     real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
@@ -122,7 +123,7 @@ module gPara
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR
     namelist /VabsAndDump/ Vabs
-    namelist /propagation/ T_tot, timeStep, timePrint
+    namelist /propagation/ timeTot, timeStep, timePrint
     namelist /inelastic/ ine
     namelist /productChannel1/ channel1
     namelist /productChannel2/ channel2
@@ -209,10 +210,10 @@ contains
 
 !> ========== Output ==========
 
-        write(outFileUnit,'(1x,a)') " ========== Input Parameters =========="
+        write(outFileUnit,'(1x,a)') " ============= Input Parameters ============="
         write(outFileUnit,'(1x,a,a,a)') "Reaction Channel: ", &
             merge("A + BC -> AB + C           ", "A + BC -> AB + C and AC + B", reactChannel==1)
-        write(outFileUnit,'(1x,a,a,a,a)') "Atoms A, B, C: ", Atoms(1), Atoms(2), Atoms(3)
+        write(outFileUnit,'(1x,6a)') "Atoms A, B, C: ", Atoms(1),', ', Atoms(2),', ', Atoms(3)
         write(outFileUnit,'(1x,a,f15.9)') "Reduced Masses of BC (a.u.):", massBC
         write(outFileUnit,'(1x,a,f15.9)') "Reduced Masses of ABC (a.u.):", massTot
         write(outFileUnit,'(1x,a,3i4)') "v0, j0, l0 : ", initWP%v0, initWP%j0, initWP%l0

@@ -101,7 +101,7 @@ contains
         real(f8), allocatable :: DVREig(:)
         real(f8), allocatable :: DVRWF(:,:)
         real(f8), allocatable :: asyBC_AtDMat(:,:,:)
-        real(f8) :: wA, cth, YjK, normWF
+        real(f8) :: wA, cth, YjK, normWF, dr, range_rA
         real(f8), external :: spgndr
         integer :: ir, v, j, K, i, ith
         integer :: normWFunit
@@ -119,9 +119,9 @@ contains
         allocate(adiaV(nPES,IALR%vasy))
         allocate(DVREig(IALR%vasy), DVRWF(IALR%vasy,IALR%vasy))
         allocate(asyBC_AtDMat(nPES,nPES,IALR%vasy))
-        allocate(asyBC_Evj(0:IALR%vasy,0:IALR%jasy))
+        allocate(asyBC_Evj(0:IALR%nr_PODVR-1,0:IALR%jasy))
         allocate(r_PODVR(IALR%nr_PODVR))
-        allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%vasy,0:IALR%jasy))
+        allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
 
 !> In this situation, bond(2) is the length of BC
 !> You should check the PES interface!
@@ -133,12 +133,14 @@ contains
             asyBC_AtDMat(:,:,ir) = AtDMat(:,:)
             adiaV(:,ir) = Vadia(:)
         end do 
-        call DVR_calc(IALR%vasy,massBC,r_Asy,adiaV,DVREig,DVRWF)
-        call PODVR(IALR%nr_PODVR,IALR%vasy,DVRWF,r_Asy,DVREig,IALR%vasy,IALR%jasy,massBC,r_PODVR,asyBC_POWF,asyBC_Evj)
+        dr = (IALR%r_range(2) - IALR%r_range(1)) / real(IALR%vint + 1, f8)
+        range_rA = dr * (IALR%vasy + 1)
+        call DVR_calc(IALR%vasy,massBC,range_rA,adiaV,DVREig,DVRWF)
+        call PODVR(IALR%nr_PODVR,IALR%vasy,DVRWF,r_Asy,DVREig,IALR%jasy,massBC,r_PODVR)
 
         normWF = 0.0_f8
-        do ir = 1, IALR%vasy 
-            normWF = normWF + asyBC_POWF(i,initWP%v0,initWP%j0)**2*(r_Asy(2)-r_Asy(1))
+        do ir = 1, IALR%nr_PODVR
+            normWF = normWF + asyBC_POWF(ir,initWP%v0,initWP%j0)**2
         end do 
 
         write(outFileUnit,'(1x,a)') '==================================================================================='
@@ -230,7 +232,7 @@ contains
         integer :: ichnl, v, j, K, Kmax
 
         ichnl = 0
-        do v = 0, IALR%vasy
+        do v = 0, IALR%nr_PODVR-1
             do j = initWP%jmin, IALR%jasy, initWP%jinc
                 Kmax = min(j, initWP%Jtot)
                 do K = initWP%Kmin, Kmax
@@ -242,7 +244,7 @@ contains
 
         allocate(qn_channel(nChannels,3))
         ichnl = 0
-        do v = 0, IALR%vasy
+        do v = 0, IALR%nr_PODVR-1
             do j = initWP%jmin, IALR%jasy, initWP%jinc
                 Kmax = min(j, initWP%Jtot)
                 do K = initWP%Kmin, Kmax
@@ -268,13 +270,12 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine DVR_calc(nDVR, mass, Grid, Vdiatom, eigVal, eigVec)
+    subroutine DVR_calc(nDVR, mass, range, Vdiatom, eigVal, eigVec)
 !> Calculate the DVR eigenvalues and eigenvectors for a given diatomic potential
 !> See J. Chem. Phys. Vol. 96 (3), 1 Feb 1992, pp 1982-1991
         implicit none
         integer, intent(in) :: nDVR
-        real(f8), intent(in) :: mass
-        real(f8), intent(in) :: Grid(:)
+        real(f8), intent(in) :: mass, range
 !> Vdiatom: nPES x nDVR
         real(f8), intent(in) :: Vdiatom(:,:)
 !> Only calculate initPES vibrational states
@@ -282,14 +283,13 @@ contains
         real(f8), intent(inout) :: eigVec(:,:) 
         integer :: i, j, info, lwork
         real(f8), allocatable :: work(:)
-        real(f8) :: fact, range
+        real(f8) :: fact
 
         associate(n => nDVR, C => eigVec, V => Vdiatom)
-        range = Grid(n) - Grid(1)
+        fact = pi*pi/(4.0_f8*mass*range*range)
 !> Since diagonal T matrix is C matrix
             do i = 1, n 
                 do j = 1, i-1
-                    fact = pi*pi/(4.0_f8*mass*range*range)
                     C(i,j) = fact  * &
                              ((dsin(pi * (i-j) / (2.0_f8 * (n+1))))**(-2) - &
                              (dsin(pi * (i+j) / (2.0_f8 * (n+1))))**(-2)) * (-1.0_f8) **(i-j)
@@ -325,7 +325,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, vmax, jmax, mass, POGrid, POWF, Evj)
+    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, jmax, mass, POGrid)
 !> Calculate the PODVR basis and eigenvalues/eigenfunctions for given DVR basis
 !> See Chemical Physics Letters 1992, 190 (3–4), 225–230.
         implicit none
@@ -333,11 +333,9 @@ contains
         real(f8), intent(in) :: DVRCoeff(:,:)
         real(f8), intent(in) :: DVRGrid(:)
         real(f8), intent(in) :: DVREig(:)
-        integer, intent(in) :: vmax, jmax
+        integer, intent(in) :: jmax
         real(f8), intent(in) :: mass
         real(f8), intent(inout) :: POGrid(:)
-        real(f8), intent(inout) :: POWF(:,:,:)
-        real(f8), intent(inout) :: Evj(:,:)
         real(f8) :: POEig(nPODVR)
         real(f8) :: POTransMat(nDVR,nPODVR)
         real(f8) :: Xmat(nPODVR,nPODVR), HRefMat(nPODVR,nPODVR), EMat(nPODVR,nPODVR)
@@ -351,7 +349,6 @@ contains
             end do
         end do
 
-        Evj = 0.0_f8
 !> Phase, the sign is choosen such that the first non-zero element is positive 
 !> See J. Chem. Phys. 158, 054801 (2023), Sec. II H
         do i = 1, nPODVR
@@ -431,12 +428,12 @@ contains
                     call phaseTrans(nPODVR, EMat(:,i))
                 end do 
 
-                do qn_v = 0, vmax 
-                    Evj(qn_v,qn_j) = POEig(qn_v+1)
+                do qn_v = 0, nPODVR-1
+                    asyBC_Evj(qn_v,qn_j) = POEig(qn_v+1)
                 end do
                 do i = 1, nPODVR
-                    do qn_v = 0, vmax 
-                        POWF(i,qn_v,qn_j) = EMat(i,qn_v+1)
+                    do qn_v = 0, nPODVR-1
+                        asyBC_POWF(i,qn_v,qn_j) = EMat(i,qn_v+1)
                     end do
                 end do
             end do
@@ -448,7 +445,7 @@ contains
     subroutine phaseTrans(n, vec)
         implicit none
         integer, intent(in) :: n
-        real(f8), intent(inout) :: vec(:)
+        real(f8), intent(inout) :: vec(n)
         integer :: i
         logical :: found = .false.
 

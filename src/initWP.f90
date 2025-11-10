@@ -10,10 +10,9 @@ module initWPMod
 contains
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine SF2BFMat(Lmin, Lmax, Kmin, Kmax, j0, Jtot, BLK)
+    subroutine SF2BFMat(Lmin, Lmax, Kmin, Kmax, j0, Jtot)
         implicit none
         integer, intent(in) :: Lmin, Lmax, Kmin, Kmax, j0, Jtot
-        real(f8), intent(inout) :: BLK(:,:)
         real(f8), external :: CG 
         real(f8) :: delta, fact, CGtmp
         integer :: iL, iK
@@ -25,7 +24,7 @@ contains
                 delta = merge(1.0_f8, dsqrt(2.0_f8), iK == 0)
                 fact = dsqrt((2.0_f8*iL+1)/(2.0_f8*Jtot+1))
                 CGtmp = CG(j0,iK,iL,0,Jtot)
-                BLK(iL,iK) = delta*fact*CGtmp
+                initWP_BLK(iL,iK) = delta*fact*CGtmp
             end do  
         end do
     end subroutine SF2BFMat
@@ -47,7 +46,7 @@ contains
             normWP = normWP + abs(initGaussWP(iZ))**2
         end do 
 
-        write(outFileUnit,'(1x,a,f15.0)') 'Initial Gaussian wave-packet normalization check: ', normWP
+        write(outFileUnit,'(1x,a,f15.9)') 'Initial Gaussian wave-packet normalization check: ', normWP
 
     end subroutine Z_initGaussWP
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -55,7 +54,6 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine getAdiaInitTotWP()
         implicit none
-        real(f8), allocatable :: BLK(:,:)
         integer :: ir, iZ, iPES, ith 
         integer :: Kmax, K, ichnl, nchnl
 
@@ -66,23 +64,21 @@ contains
 
         Kmax = min(initWP%j0, initWP%Jtot)
         nchnl = Kmax - initWP%Kmin + 1
-        allocate(BLK(1,initWP%Kmin:Kmax))
+        allocate(initWP_BLK(0:0,initWP%Kmin:Kmax))
         allocate(initTotWP(nPES,IALR%nZ_IALR,IALR%nr_PODVR,IALR%jasy,nchnl))
 
-        call SF2BFMat(initWP%l0,initWP%l0,initWP%Kmin,Kmax,initWP%j0,initWP%Jtot,BLK)
+        call SF2BFMat(initWP%l0,initWP%l0,initWP%Kmin,Kmax,initWP%j0,initWP%Jtot)
 !> Construct initial WP in adiabatic representation
         do iZ = 1, IALR%nZ_IALR
             do ir = 1, IALR%nr_PODVR
                 do ith = 1, IALR%jasy 
                     do K = initWP%Kmin, Kmax 
                         ichnl = seq_channel(initWP%v0,initWP%j0,K)
-                        initTotWP(:,iZ,ir,ith,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir,ith)*BLK(1,K)
+                        initTotWP(:,iZ,ir,ith,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir,ith)*initWP_BLK(initWP%l0,K)
                     end do 
                 end do 
             end do 
         end do
-
-        deallocate(BLK)
 
     end subroutine getAdiaInitTotWP
 !> ------------------------------------------------------------------------------------------------------------------ <!

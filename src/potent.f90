@@ -11,16 +11,15 @@ contains
         real(f8), intent(in) :: Z, r, theta 
         real(f8), intent(in) :: massB, massC 
         real(f8), intent(out) :: bond(3)
-        real(f8) :: rOB, rOC, th
+        real(f8) :: rOB, rOC
 
 !> bond(1) = rAB, bond(2) = rBC, bond(3) = rAC
-!> theta in degree
+!> theta in radian
         bond(2) = r
-        th = theta * pi / 180.0_f8
         rOB = massC / (massB+massC) * r 
         rOC = massB / (massB+massC) * r 
-        bond(1) = dsqrt(Z*Z+rOB*rOB-2.0_f8*Z*rOB*dcos(th))
-        bond(3) = dsqrt(Z*Z+rOC*rOC+2.0_f8*Z*rOC*dcos(th))
+        bond(1) = dsqrt(Z*Z+rOB*rOB-2.0_f8*Z*rOB*dcos(theta))
+        bond(3) = dsqrt(Z*Z+rOC*rOC+2.0_f8*Z*rOC*dcos(theta))
 
     end subroutine Jacobi2Bond
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -33,7 +32,7 @@ contains
         real(f8), intent(out) :: Z, r, theta 
         real(f8) :: r1, r2, a1, a2
 
-!> theta in degree
+!> theta in radian
         r = bond(2)
         r1 = massB * r / (massB+massC)
         r2 = massC * r / (massB+massC)
@@ -44,8 +43,8 @@ contains
 
         if (a2 > 1.0_f8) a2 = 1.0_f8
         if (a2 < -1.0_f8) a2 = -1.0_f8
-        theta = dacos(a2) * 180.0_f8 / pi 
-        if (Z == 0.0_f8) theta = 90.0_f8
+        theta = dacos(a2)
+        if (Z == 0.0_f8) theta = pi / 2.0_f8
     
     end subroutine bond2Jacobi
 !> ------------------------------------------------------------------------------------------------------------------ <!
