@@ -34,6 +34,7 @@ module gPara
     end type IALR_class
 
     type :: Vabs_class
+        integer :: nZasy, nZlr, nrabs
         real(f8) :: Casy, Clr, Cr 
         real(f8) :: Zasy_range, Zlr_range, rabs_range
     end type Vabs_class
@@ -98,12 +99,19 @@ module gPara
     real(f8) :: lrBC_Evj
     real(f8), allocatable :: lrWFvjK(:,:,:)
     real(f8), allocatable :: lrBC_POWF(:)
+    real(f8), allocatable :: asyBC_AtDMat(:,:,:)
+!> FBR in theta, Z_int
+    real(f8), allocatable :: intANode(:), intAWeight(:)
 !> Initial Gaussian-shape WP and initial total WP
     complex(c8), allocatable :: initGaussWP(:)
-    complex(c8), allocatable :: initTotWP(:,:,:,:,:)
+    complex(c8), allocatable :: initAdiaTotWP(:,:,:,:,:)
+    complex(c8), allocatable :: initDiaTotWP(:,:,:,:,:)
     real(f8), allocatable :: initWP_BLK(:,:)
 !> Vabs
     real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
+!> Interaction potential matrix and diabatic-to-adiabatic transformation matrix
+    real(f8), allocatable :: INT_Vadia(:,:,:,:), INT_AtD(:,:,:,:,:)
+    real(f8), allocatable :: ALR_Vadia(:,:,:,:), ALR_AtD(:,:,:,:,:)
 !> Product channel grids
     real(f8), allocatable :: rp1(:)
     real(f8), allocatable :: rp2(:)

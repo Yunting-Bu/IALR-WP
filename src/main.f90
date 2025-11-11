@@ -5,6 +5,7 @@ program IALR_WP_SO
     use initWPMod
     implicit none
 
+!> Test
     call initPara()
     call DVR_IALR()
     call getAdiaInitTotWP()

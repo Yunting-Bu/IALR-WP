@@ -65,7 +65,7 @@ contains
         Kmax = min(initWP%j0, initWP%Jtot)
         nchnl = Kmax - initWP%Kmin + 1
         allocate(initWP_BLK(0:0,initWP%Kmin:Kmax))
-        allocate(initTotWP(nPES,IALR%nZ_IALR,IALR%nr_PODVR,IALR%jasy,nchnl))
+        allocate(initAdiaTotWP(nPES,IALR%nZ_IALR,IALR%nr_PODVR,IALR%jasy,nchnl))
 
         call SF2BFMat(initWP%l0,initWP%l0,initWP%Kmin,Kmax,initWP%j0,initWP%Jtot)
 !> Construct initial WP in adiabatic representation
@@ -74,7 +74,7 @@ contains
                 do ith = 1, IALR%jasy 
                     do K = initWP%Kmin, Kmax 
                         ichnl = seq_channel(initWP%v0,initWP%j0,K)
-                        initTotWP(:,iZ,ir,ith,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir,ith)*initWP_BLK(initWP%l0,K)
+                        initAdiaTotWP(:,iZ,ir,ith,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir,ith)*initWP_BLK(initWP%l0,K)
                     end do 
                 end do 
             end do 
@@ -82,6 +82,29 @@ contains
 
     end subroutine getAdiaInitTotWP
 !> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine getDiaInitTotWP()
+        implicit none
+        integer :: iPES, iZ, ir, ith 
+        integer :: Kmax, K, nchnl
+
+        Kmax = min(initWP%j0, initWP%Jtot)
+        nchnl = Kmax - initWP%Kmin + 1
+        allocate(initDiaTotWP(nPES,IALR%nZ_IALR,IALR%nr_PODVR,IALR%jasy,nchnl))
+
+        do iPES = 1, nPES
+            do iZ = 1, IALR%nZ_IALR
+                do ir = 1, IALR%nr_PODVR
+                    do ith = 1, IALR%jasy 
+                        initDiaTotWP(iPES,iZ,ir,ith,:) = initAdiaTotWP(iPES,iZ,ir,ith,:) * asyBC_AtDMat(iPES,ir)
+                    end do 
+                end do 
+            end do 
+        end do
+    end subroutine getDiaInitTotWP
+!> ------------------------------------------------------------------------------------------------------------------ <!
+        
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
     complex(c8) function GaussianWavePacket(E0, delta, Z0, mass, Z) result(WP)

@@ -93,6 +93,17 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine int_thetaWF()
+        implicit none
+
+        allocate(intANode(IALR%jint))
+        allocate(intAWeight(IALR%jint))
+        call getANodeAndWeight(initWP%jpar, IALR%jint, intANode, intAWeight)
+
+    end subroutine int_thetaWF
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine asyBC_vibRotThetaWF()
         implicit none
         real(f8), parameter :: longDistance = 30.0_f8
@@ -100,7 +111,6 @@ contains
         real(f8), allocatable :: adiaV(:,:)
         real(f8), allocatable :: DVREig(:)
         real(f8), allocatable :: DVRWF(:,:)
-        real(f8), allocatable :: asyBC_AtDMat(:,:,:)
         real(f8) :: wA, cth, YjK, normWF, dr, range_rA
         real(f8), external :: spgndr
         integer :: ir, v, j, K, i, ith
@@ -118,7 +128,7 @@ contains
 !> Allocate PODVR array
         allocate(adiaV(nPES,IALR%vasy))
         allocate(DVREig(IALR%vasy), DVRWF(IALR%vasy,IALR%vasy))
-        allocate(asyBC_AtDMat(nPES,nPES,IALR%vasy))
+        allocate(asyBC_AtDMat(nPES,IALR%vasy))
         allocate(asyBC_Evj(0:IALR%nr_PODVR-1,0:IALR%jasy))
         allocate(r_PODVR(IALR%nr_PODVR))
         allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
@@ -130,7 +140,7 @@ contains
         do ir = 1, IALR%vasy
             bond(2) = r_Asy(ir)
             call diagDiaVmat(bond,AtDMat,Vadia)
-            asyBC_AtDMat(:,:,ir) = AtDMat(:,:)
+            asyBC_AtDMat(:,ir) = AtDMat(:,initWP%initPES)
             adiaV(:,ir) = Vadia(:)
         end do 
         dr = (IALR%r_range(2) - IALR%r_range(1)) / real(IALR%vint + 1, f8)
