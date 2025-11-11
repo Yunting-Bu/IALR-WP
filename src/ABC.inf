@@ -56,11 +56,11 @@
 
 ! Absorbing potential parameters
 &VabsAndDump
-    Vabs%Zasy_range        = 40.0, 80.0                  ! Z grid range for asymptotic absorbing potential
+    Vabs%Zasy_range        = 40.0                        ! Z grid range for asymptotic absorbing potential
     Vabs%Casy              = 0.005                       ! Coefficient for asymptotic absorbing potential
-    Vabs%Zlr_range         = 200.0, 3000.0               ! Z grid range for long-range absorbing potential
+    Vabs%Zlr_range         = 2800.0                      ! Z grid range for long-range absorbing potential
     Vabs%Clr               = 0.00001                     ! Coefficient for long-range absorbing potential
-    Vabs%rabs_range        = 4.0, 6.0                    ! r grid range for radial absorbing potential
+    Vabs%rabs_range        = 2.0                         ! r grid range for radial absorbing potential
     Vabs%Cr                = 0.01                        ! Coefficient for radial absorbing potential
 /
 

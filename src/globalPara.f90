@@ -35,7 +35,7 @@ module gPara
 
     type :: Vabs_class
         real(f8) :: Casy, Clr, Cr 
-        real(f8) :: Zasy_range(2), Zlr_range(2), rabs_range(2)
+        real(f8) :: Zasy_range, Zlr_range, rabs_range
     end type Vabs_class
 
     type :: ine_class
@@ -102,8 +102,7 @@ module gPara
     complex(c8), allocatable :: initGaussWP(:)
     complex(c8), allocatable :: initTotWP(:,:,:,:,:)
     real(f8), allocatable :: initWP_BLK(:,:)
-!> Vabs grids and value
-    real(f8), allocatable :: Zasy(:), ZLr(:), rabs(:)
+!> Vabs
     real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
 !> Product channel grids
     real(f8), allocatable :: rp1(:)
@@ -111,7 +110,7 @@ module gPara
 !> Tpyes declarations
     type(initWP_class) :: initWP
     type(IALR_class) :: IALR 
-    type(Vabs_class) :: Vabs 
+    type(Vabs_class) :: abs 
     type(ine_class) :: ine 
     type(channel1_class) :: channel1
     type(channel2_class) :: channel2 
@@ -122,7 +121,7 @@ module gPara
     namelist /energy/ E_range, dE
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR
-    namelist /VabsAndDump/ Vabs
+    namelist /VabsAndDump/ abs
     namelist /propagation/ timeTot, timeStep, timePrint
     namelist /inelastic/ ine
     namelist /productChannel1/ channel1

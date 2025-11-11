@@ -85,5 +85,37 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine getVabs(range, Cabs, nGird, grid, dt, nabs, Vabs)
+        implicit none
+        real(f8), intent(in) :: range, Cabs 
+        integer, intent(in) :: nGird 
+        real(f8), intent(in) :: grid(nGird)
+        real(f8), intent(in) :: dt
+        integer, intent(out) :: nabs
+        real(f8), allocatable, intent(inout) :: Vabs(:)
+        real(f8) :: rangeAll, rangeNoAbs
+        integer :: i
+
+!> Since DVR grid don't have the boundary point
+        rangeAll = grid(nGird) + grid(2) - grid(1)
+        rangeNoAbs = rangeAll - range
+        do i = 1, nGird
+            if (grid(i) >= rangeNoAbs) then
+                Vabs(i) = dexp(-Cabs * ((grid(i)-rangeNoAbs)/(rangeAll - rangeNoAbs))**2 * dt)
+            else
+                Vabs(i) = 1.0_f8
+                nabs = i
+            end if
+        end do
+!> Should be moved later
+        write(outFileUnit,'(1x,a)') 'Absorbing potential in r:'
+        write(outFileUnit,'(1x,a,f15.9,a,f15.9,a)') 'Range of rabs: [', rangeNoAbs, ', ', rangeAll, ' ]' 
+        write(outFileUnit,'(1x,a,i5,a)') 'When nr_DVR >=', nabs, ', the absorbing potential starts to work.'
+        write(outFileUnit,'(1x,a)') 'Please ensure thet the intermediate coordinate lies outside the absorbing region !!'
+
+    end subroutine getVabs
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
     
 end module potentMod
