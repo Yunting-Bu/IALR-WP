@@ -110,7 +110,7 @@ contains
         real(f8) :: bond(3), AtDMat(nPES,nPES), Vadia(nPES)
         real(f8), allocatable :: adiaV(:,:)
         real(f8), allocatable :: DVREig(:)
-        real(f8), allocatable :: DVRWF(:,:)
+        real(f8), allocatable :: DVRWF(:,:), asyDiaPOWF(:,:,:), asyDVRWF(:,:,:)
         real(f8) :: wA, cth, YjK, normWF, dr, range_rA
         real(f8), external :: spgndr
         integer :: ir, v, j, K, i, ith
@@ -122,7 +122,9 @@ contains
 !> Channel set as (v,j,K)
         call setChannel()
 !> Allocate wave function
-        allocate(asyWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
+        allocate(asyAdiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
+        allocate(asyDiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
+        allocate(tmp(IALR%nr_PODVR, IALR%vasy))
         call getANodeAndWeight(initWP%jpar, IALR%jasy, asyANode, asyAWeight)
 
 !> Allocate PODVR array
@@ -131,7 +133,10 @@ contains
         allocate(asyBC_AtDMat(nPES,IALR%vasy))
         allocate(asyBC_Evj(0:IALR%nr_PODVR-1,0:IALR%jasy))
         allocate(r_PODVR(IALR%nr_PODVR))
+        allocate(asyPO2DVR(IALR%nr_PODVR, IALR%vasy))
+        allocate(asyDVRWF(IALR%vasy, 0:IALR%nr_PODVR-1,0:IALR%jasy))
         allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
+        allocate(asyDiaPOWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
 
 !> In this situation, bond(2) is the length of BC
 !> You should check the PES interface!
@@ -146,7 +151,7 @@ contains
         dr = (IALR%r_range(2) - IALR%r_range(1)) / real(IALR%vint + 1, f8)
         range_rA = dr * (IALR%vasy + 1)
         call DVR_calc(IALR%vasy,massBC,range_rA,adiaV,DVREig,DVRWF)
-        call PODVR(IALR%nr_PODVR,IALR%vasy,DVRWF,r_Asy,DVREig,IALR%jasy,massBC,r_PODVR)
+        call PODVR(IALR%nr_PODVR,IALR%vasy,DVRWF,r_Asy,DVREig,IALR%jasy,massBC,r_PODVR,asyPO2DVR)
 
         normWF = 0.0_f8
         do ir = 1, IALR%nr_PODVR
@@ -161,6 +166,16 @@ contains
         write(outFileUnit,*) ''
         write(outFileUnit,'(1x,a,f15.9)') 'Initial ro-vibrational wave function normalization check: ', normWF
         write(outFileUnit,'(1x,a)') '==================================================================================='
+
+        !block 
+        !    real(f8) :: tmpDVRWF(IALR%vasy), tmpPOWF(IALR%nr_PODVR)
+        !    integer :: iv, ij 
+
+!            do iv = 0, IALR%nr_PODVR-1
+!                do ij = 0, IALR%jasy 
+!                    tmpPOWF(:) = asyBC_POWF(:,iv,ij)
+!                    tmpDVRWF = matmul(asyPO2DVR, tmpPOWF)
+
 
         do i = 1, nChannels
             v = qn_channel(i,1)
@@ -335,7 +350,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, jmax, mass, POGrid)
+    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, jmax, mass, POGrid,POTransMat)
 !> Calculate the PODVR basis and eigenvalues/eigenfunctions for given DVR basis
 !> See Chemical Physics Letters 1992, 190 (3–4), 225–230.
         implicit none
@@ -346,8 +361,8 @@ contains
         integer, intent(in) :: jmax
         real(f8), intent(in) :: mass
         real(f8), intent(inout) :: POGrid(:)
+        real(f8), intent(inout) :: POTransMat(:,:)
         real(f8) :: POEig(nPODVR)
-        real(f8) :: POTransMat(nDVR,nPODVR)
         real(f8) :: Xmat(nPODVR,nPODVR), HRefMat(nPODVR,nPODVR), EMat(nPODVR,nPODVR)
         real(f8), allocatable :: work(:)
         integer :: i, j, l, info, lwork
@@ -379,6 +394,9 @@ contains
                 end do
             end do
         end block
+
+!> DVR to PODVR transformation matrix
+        asyPO2DVR = Xmat
 
         allocate(work(1))
         call dsyev('V', 'U', nPODVR, Xmat, nPODVR, POGrid, work, -1, info)

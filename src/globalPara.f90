@@ -87,11 +87,12 @@ module gPara
 !> B for DVR-FBR transformation matrix
     real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_All(:), r_Asy(:)
     real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rAll(:,:), B_rAsy(:,:)
-    real(f8), allocatable :: r_PODVR(:)
+    real(f8), allocatable :: r_PODVR(:), asyPO2DVR(:,:)
 !> Grids and weights for K independent Gauss-Legendre quadrature
     real(f8), allocatable :: asyANode(:), asyAWeight(:)
 !> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in asymptotic range
-    real(f8), allocatable :: asyWFvjK(:,:,:)
+    real(f8), allocatable :: asyAdiaWFvjK(:,:,:)
+    real(f8), allocatable :: asyDiaWFvjK(:,:,:)
     real(f8), allocatable :: asyBC_Evj(:,:)
     real(f8), allocatable :: asyBC_POWF(:,:,:)
 !> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in long-range
