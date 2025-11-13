@@ -28,7 +28,8 @@ module gPara
     end type initWP_class
 
     type :: IALR_class
-       integer :: nZ_IALR, nZ_IA, nZ_I, nr_PODVR 
+       integer :: nZ_IALR, nZ_IA, nZ_I
+       integer :: nr_asy, nr_PODVR, nr_int
        integer :: vint, jint, vasy, jasy 
        real(f8) :: Z_range(2), r_range(2)
     end type IALR_class
@@ -71,22 +72,22 @@ module gPara
     real(f8) :: atomMass(3), massBC, massTot
     character(len=2) :: Atoms(3)
 !> Output and other flags
-    character(len=3) :: potentialType
+    character(len=4) :: potentialType
     character(len=50) :: outfile
     logical :: IF_inelastic
 !> Flux
     character(len=1) :: IDflux 
     real(f8) :: fluxPos
 !> Channels
-    integer :: nChannels
-    integer, allocatable :: qn_channel(:,:)
-    integer, allocatable :: seq_channel(:,:,:)
+    integer :: nAsyChannels
+    integer, allocatable :: qnAsy_channel(:,:)
+    integer, allocatable :: seqAsy_channel(:,:,:)
 !> I - interaction region
 !> A - asymptotic region
 !> LR - long range region
 !> B for DVR-FBR transformation matrix
-    real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_All(:), r_Asy(:)
-    real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rAll(:,:), B_rAsy(:,:)
+    real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_Int(:), r_Asy(:)
+    real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rInt(:,:), B_rAsy(:,:)
     real(f8), allocatable :: r_PODVR(:), asyPO2DVR(:,:)
 !> Grids and weights for K independent Gauss-Legendre quadrature
     real(f8), allocatable :: asyANode(:), asyAWeight(:)
@@ -100,7 +101,7 @@ module gPara
     real(f8) :: lrBC_Evj
     real(f8), allocatable :: lrWFvjK(:,:,:)
     real(f8), allocatable :: lrBC_POWF(:)
-    real(f8), allocatable :: asyBC_AtDMat(:,:,:)
+    real(f8), allocatable :: asyBC_AtDMat(:,:)
 !> FBR in theta, Z_int
     real(f8), allocatable :: intANode(:), intAWeight(:)
 !> Initial Gaussian-shape WP and initial total WP
@@ -119,7 +120,7 @@ module gPara
 !> Tpyes declarations
     type(initWP_class) :: initWP
     type(IALR_class) :: IALR 
-    type(Vabs_class) :: abs 
+    type(Vabs_class) :: Vabs 
     type(ine_class) :: ine 
     type(channel1_class) :: channel1
     type(channel2_class) :: channel2 
@@ -130,7 +131,7 @@ module gPara
     namelist /energy/ E_range, dE
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR
-    namelist /VabsAndDump/ abs
+    namelist /VabsAndDump/ Vabs
     namelist /propagation/ timeTot, timeStep, timePrint
     namelist /inelastic/ ine
     namelist /productChannel1/ channel1

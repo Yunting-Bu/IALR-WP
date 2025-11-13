@@ -1,5 +1,5 @@
 module potentMod
-    use machina_basic, only : f8 
+    use machina_basic, only : f8, BinReadWrite 
     use gPara
     implicit none
 
@@ -13,7 +13,7 @@ contains
         implicit none
         real(f8), intent(in) :: Z, r, theta 
         real(f8), intent(in) :: massB, massC 
-        real(f8), intent(out) :: bond(3)
+        real(f8), intent(inout) :: bond(3)
         real(f8) :: rOB, rOC
 
 !> bond(1) = rAB, bond(2) = rBC, bond(3) = rAC
@@ -88,14 +88,14 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine getVabs(range, Cabs, nGird, grid, dt, nabs, Vabs)
+    subroutine getVabs(range, Cabs, nGird, grid, dt, nabs, VabsMat)
         implicit none
         real(f8), intent(in) :: range, Cabs 
         integer, intent(in) :: nGird 
         real(f8), intent(in) :: grid(nGird)
-        real(f8), intent(in) :: dt
+        integer, intent(in) :: dt
         integer, intent(out) :: nabs
-        real(f8), allocatable, intent(inout) :: Vabs(:)
+        real(f8), allocatable, intent(inout) :: VabsMat(:)
         real(f8) :: rangeAll, rangeNoAbs
         integer :: i
 
@@ -104,9 +104,9 @@ contains
         rangeNoAbs = rangeAll - range
         do i = 1, nGird
             if (grid(i) >= rangeNoAbs) then
-                Vabs(i) = dexp(-Cabs * ((grid(i)-rangeNoAbs)/(rangeAll - rangeNoAbs))**2 * dt)
+                VabsMat(i) = dexp(-Cabs * ((grid(i)-rangeNoAbs)/(rangeAll - rangeNoAbs))**2 * dt)
             else
-                Vabs(i) = 1.0_f8
+                VabsMat(i) = 1.0_f8
                 nabs = i
             end if
         end do
@@ -123,21 +123,21 @@ contains
     subroutine initAllVabs()
         implicit none
 
-        write(outFileUnit,'(1x,a)') '==========  Vasb =========='
+        write(outFileUnit,'(1x,a)') '----------  Vasb ----------'
 !> Vabs in r
-        allocate(Fabs(IALR%vint))
+        allocate(Fabs(IALR%nr_int))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in r:'
-        call getVabs(abs%rabs_range,abs%Cr,IALR%vint,r_All,timeStep,abs%nrabs,Fabs)
+        call getVabs(Vabs%rabs_range,Vabs%Cr,IALR%nr_int,r_Int,timeStep,Vabs%nrabs,Fabs)
 !> Vabs in long-range
         allocate(Flr(IALR%nZ_IALR))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in Z_lr:'
-        call getVabs(abs%Zlr_range,abs%Clr,IALR%nZ_IALR,Z_IALR,timeStep,abs%nZlr,Flr)
+        call getVabs(Vabs%Zlr_range,Vabs%Clr,IALR%nZ_IALR,Z_IALR,timeStep,Vabs%nZlr,Flr)
 !> Vabs in asymptotic
         allocate(Fasy(IALR%nZ_IA))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in Z_asy:'
         write(outFileUnit,'(1x,a)') 'Note that the Vabs only works for the channel with (v, j, iPES) /= (v0, j0, initPES)!'
-        call getVabs(abs%Zasy_range,abs%Casy,IALR%nZ_IA,Z_IA,timeStep,abs%nZasy,Fasy)
-        write(outFileUnit,'(1x,a)') '============================'
+        call getVabs(Vabs%Zasy_range,Vabs%Casy,IALR%nZ_IA,Z_IA,timeStep,Vabs%nZasy,Fasy)
+        write(outFileUnit,'(1x,a)') '---------------------------'
 
     end subroutine initAllVabs
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -148,12 +148,12 @@ contains
         integer, intent(in) :: nZ, nr, nth 
         real(f8), intent(in) :: ZGrid(nZ), rGrid(nr), thGrid(nth) 
         character(len=*), intent(in) :: type 
-        real(f8), intent(inout) :: Vadia(nPES,nZ,nr,nth)
-        real(f8), intent(out) :: AtD(nPES,nPES,nZ,nr,nth)
+        real(f8), intent(inout) :: Vadia(:,:,:,:)
+        real(f8), intent(inout) :: AtD(:,:,:,:,:)
         real(f8) :: bond(3)
         real(f8) :: adiaV(nPES), AtDMat(nPES,nPES)
         real(f8) :: Z, r, th
-        integer :: iZ, ir, ith, streamUnit
+        integer :: iZ, ir, ith
         character(len=256) :: fileName
 
         do iZ = 1, nZ
@@ -174,14 +174,10 @@ contains
 !> Type = 'INT', for the nr_all * nZ_I range
 !> Type = 'ALR', for the nr_asy * (nZ_asy+nZ_lr) range 
         fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'
-        open(unit=streamUnit, file=trim(fileName), access='stream', form='unformatted', status='replace')
-        write(streamUnit) Vadia
-        close(streamUnit)
+        call BinReadWrite(fileName, Vadia, 'write')
 
         fileName = 'AtD_'//trim(outfile)//'_'//trim(type)//'.bin'
-        open(unit=streamUnit, file=trim(fileName), access='stream', form='unformatted', status='replace')
-        write(streamUnit) AtD
-        close(streamUnit)
+        call BinReadWrite(fileName, AtD, 'write')
 
 
     end subroutine interactionPot
@@ -192,30 +188,26 @@ contains
         implicit none
         integer :: nZ_ALR
         integer :: streamUnit 
-        real(f8), allocatable :: Z_ALR
+        real(f8), allocatable :: Z_ALR(:)
         character(len=3) :: type
         character(len=256) :: fileName
         
 
 !> Interaction potential in the interaction region
-        allocate(INT_Vadia(nPES,IALR%nZ_I,IALR%vint,IALR%jint))
-        allocate(INT_AtD(nPES,nPES,IALR%nZ_I,IALR%vint,IALR%jint))
+        allocate(INT_Vadia(nPES,IALR%nZ_I,IALR%nr_int,IALR%jint))
+        allocate(INT_AtD(nPES,nPES,IALR%nZ_I,IALR%nr_int,IALR%jint))
         type = 'INT'
-        if (potentialType == 'New') then 
+        if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the interaction region...'
-            call interactionPot(IALR%nZ_I, IALR%vint, IALR%jint, Z_I, r_All, intANode, type, INT_Vadia, INT_AtD)
-        else if (potentialType == 'Read') then 
+            call interactionPot(IALR%nZ_I, IALR%nr_int, IALR%jint, Z_I, r_Int, intANode, type, INT_Vadia, INT_AtD)
+        else if (trim(potentialType) == 'Read') then 
 
             fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'
-            open(unit=streamUnit, file=trim(fileName), access='stream', form='unformatted', status='replace')
-            read(streamUnit) INT_Vadia
-            close(streamUnit)
+            call BinReadWrite(fileName, INT_Vadia, 'read')
             write(outFileUnit,'(1x,a,a)') 'Read INT_Vadia in file: ', trim(fileName)
 
             fileName = 'AtD_'//trim(outfile)//'_'//trim(type)//'.bin'
-            open(unit=streamUnit, file=trim(fileName), access='stream', form='unformatted', status='replace')
-            read(streamUnit) INT_AtD
-            close(streamUnit)
+            call BinReadWrite(fileName, INT_AtD, 'read')
             write(outFileUnit,'(1x,a,a)') 'Read INT_AtD in file: ', trim(fileName)
         else 
             write(outFileUnit,'(1x,a)') 'Error: unknown potentialType, must Read or New !'
@@ -228,24 +220,20 @@ contains
         allocate(Z_ALR(nZ_ALR))
         Z_ALR(1:IALR%nZ_IA) = Z_IALR(IALR%nZ_I+1:IALR%nZ_IALR)
 
-        allocate(ALR_Vadia(nPES,nZ_ALR,IALR%vasy,IALR%jasy))
-        allocate(ALR_AtD(nPES,nPES,nZ_ALR,IALR%vasy,IALR%jasy))
+        allocate(ALR_Vadia(nPES,nZ_ALR,IALR%nr_asy,IALR%jasy))
+        allocate(ALR_AtD(nPES,nPES,nZ_ALR,IALR%nr_asy,IALR%jasy))
         type = 'ALR'
-        if (potentialType == 'New') then 
+        if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the asymptotic and long-range region...'
-            call interactionPot(nZ_ALR, IALR%vasy, IALR%jasy, Z_ALR, r_Asy, asyANode, type, ALR_Vadia, ALR_AtD)
-        else if (potentialType == 'Read') then 
+            call interactionPot(nZ_ALR, IALR%nr_asy, IALR%jasy, Z_ALR, r_Asy, asyANode, type, ALR_Vadia, ALR_AtD)
+        else if (trim(potentialType) == 'Read') then 
 
             fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'
-            open(unit=streamUnit, file=trim(fileName), access='stream', form='unformatted', status='replace')
-            read(streamUnit) ALR_Vadia
-            close(streamUnit)
+            call BinReadWrite(fileName, ALR_Vadia, 'read')
             write(outFileUnit,'(1x,a,a)') 'Read ALR_Vadia in file: ', trim(fileName)
 
             fileName = 'AtD_'//trim(outfile)//'_'//trim(type)//'.bin'
-            open(unit=streamUnit, file=trim(fileName), access='stream', form='unformatted', status='replace')
-            read(streamUnit) ALR_AtD
-            close(streamUnit)
+            call BinReadWrite(fileName, ALR_AtD, 'read')
             write(outFileUnit,'(1x,a,a)') 'Read ALR_AtD in file: ', trim(fileName)
         else 
             write(outFileUnit,'(1x,a)') 'Error: unknown potentialType, must Read or New !'

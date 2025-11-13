@@ -73,7 +73,7 @@ contains
             do ir = 1, IALR%nr_PODVR
                 do ith = 1, IALR%jasy 
                     do K = initWP%Kmin, Kmax 
-                        ichnl = seq_channel(initWP%v0,initWP%j0,K)
+                        ichnl = seqAsy_channel(initWP%v0,initWP%j0,K)
                         initAdiaTotWP(:,iZ,ir,ith,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir,ith)*initWP_BLK(initWP%l0,K)
                     end do 
                 end do 

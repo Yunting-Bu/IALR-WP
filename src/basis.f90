@@ -5,7 +5,7 @@ module basisMod
     implicit none
     public
 
-    private :: setChannel, asyBC_vibRotThetaWF
+    private :: setChannel, asyBC_vibRotThetaWF, int_thetaWF
    
 contains
 
@@ -54,7 +54,7 @@ contains
 !>      |----|----|----|
 !> r1   |----|----|----|
 !>      Z1   Z2   Z3   Z4
-!>  nDVR in range [r1, r3] = vint, nDVR in range [r1, r2] = vasy 
+!>  nDVR in range [r1, r3] = vint, nDVR in range [r1, r2] = nr_asy 
 !>  VAbs: Z3 = Zabs_asy_end, Z4 = Zabs_lr_end
 
 !> Allocate IALR DVR grids, kinetic energy and transMatrix
@@ -64,9 +64,9 @@ contains
         allocate(BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
         allocate(BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
         allocate(BZ_I(IALR%nZ_I, IALR%nZ_I))
-        allocate(r_Asy(IALR%vasy), r_All(IALR%vint))
-        allocate(B_rAll(IALR%vint, IALR%vint))
-        allocate(B_rAsy(IALR%vasy, IALR%vasy))
+        allocate(r_Asy(IALR%nr_asy), r_Int(IALR%nr_int))
+        allocate(B_rInt(IALR%nr_int, IALR%nr_int))
+        allocate(B_rAsy(IALR%nr_asy, IALR%nr_asy))
 
 !> ======== DVR calculate =========
         range_IALR = IALR%Z_range(2) - IALR%Z_range(1)
@@ -76,18 +76,23 @@ contains
 
         range_IA = dR * (IALR%nZ_IA + 1)
         call DVR_TransMat(range_IA, IALR%nZ_IA, BZ_IA)
+        Z_IA(1:IALR%nZ_IA) = Z_IALR(1:IALR%nZ_IA) 
 
         range_I = dR * (IALR%nZ_I + 1)
         call DVR_TransMat(range_I, IALR%nZ_I, BZ_I)
+        Z_I(1:IALR%nZ_I) = Z_IALR(1:IALR%nZ_I) 
 
         range_r = IALR%r_range(2) - IALR%r_range(1)
-        dR = range_r / real(IALR%vint + 1, f8)
-        call DVR_Grid(IALR%vint, IALR%r_range(1), IALR%r_range(2), r_All)
-        call DVR_TransMat(range_r, IALR%vint, B_rAll)
+        dR = range_r / real(IALR%nr_int + 1, f8)
+        call DVR_Grid(IALR%nr_int, IALR%r_range(1), IALR%r_range(2), r_Int)
+        call DVR_TransMat(range_r, IALR%nr_int, B_rInt)
 
-        range_rA = dR * (IALR%vasy + 1)
-        call DVR_TransMat(range_rA, IALR%vasy, B_rAsy)
-        r_Asy(:) = r_All(1:IALR%vasy)
+        range_rA = dR * (IALR%nr_asy + 1)
+        call DVR_TransMat(range_rA, IALR%nr_asy, B_rAsy)
+        r_Asy(:) = r_Int(1:IALR%nr_asy)
+
+!> Interaction theta basis
+        call int_thetaWF()
 
     end subroutine DVR_IALR
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -111,7 +116,7 @@ contains
         real(f8), allocatable :: adiaV(:,:)
         real(f8), allocatable :: DVREig(:)
         real(f8), allocatable :: DVRWF(:,:), asyDiaPOWF(:,:,:), asyDVRWF(:,:,:)
-        real(f8) :: wA, cth, YjK, normWF, dr, range_rA
+        real(f8) :: wA, cth, PjK, normWF, dr, range_rA
         real(f8), external :: spgndr
         integer :: ir, v, j, K, i, ith
         integer :: normWFunit
@@ -120,38 +125,42 @@ contains
         allocate(asyANode(IALR%jasy))
         allocate(asyAWeight(IALR%jasy))
 !> Channel set as (v,j,K)
-        call setChannel()
+        call setChannel(IALR%vasy,IALR%jasy,nAsyChannels,qnAsy_channel,seqAsy_channel)
 !> Allocate wave function
-        allocate(asyAdiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
-        allocate(asyDiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
-        allocate(tmp(IALR%nr_PODVR, IALR%vasy))
+        allocate(asyAdiaWFvjK(nAsyChannels,IALR%nr_PODVR,IALR%jasy))
+!        allocate(asyDiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
+!        allocate(tmp(IALR%nr_PODVR, IALR%vasy))
         call getANodeAndWeight(initWP%jpar, IALR%jasy, asyANode, asyAWeight)
 
 !> Allocate PODVR array
-        allocate(adiaV(nPES,IALR%vasy))
-        allocate(DVREig(IALR%vasy), DVRWF(IALR%vasy,IALR%vasy))
-        allocate(asyBC_AtDMat(nPES,IALR%vasy))
-        allocate(asyBC_Evj(0:IALR%nr_PODVR-1,0:IALR%jasy))
+        allocate(adiaV(nPES,IALR%nr_asy))
+        allocate(DVREig(IALR%nr_asy), DVRWF(IALR%nr_asy,IALR%nr_asy))
+        allocate(asyBC_AtDMat(nPES,IALR%nr_asy))
+        allocate(asyBC_Evj(0:IALR%vasy,0:IALR%jasy))
         allocate(r_PODVR(IALR%nr_PODVR))
-        allocate(asyPO2DVR(IALR%nr_PODVR, IALR%vasy))
-        allocate(asyDVRWF(IALR%vasy, 0:IALR%nr_PODVR-1,0:IALR%jasy))
-        allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
-        allocate(asyDiaPOWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
+        allocate(asyPO2DVR(IALR%nr_asy,IALR%nr_PODVR))
+!        allocate(asyDVRWF(IALR%nr_asy, 0:IALR%nr_PODVR-1,0:IALR%jasy))
+        allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%vasy,0:IALR%jasy))
+!        allocate(asyDiaPOWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
 
 !> In this situation, bond(2) is the length of BC
 !> You should check the PES interface!
         bond(1) = longDistance
         bond(3) = longDistance
-        do ir = 1, IALR%vasy
+        do ir = 1, IALR%nr_asy
             bond(2) = r_Asy(ir)
             call diagDiaVmat(bond,AtDMat,Vadia)
             asyBC_AtDMat(:,ir) = AtDMat(:,initWP%initPES)
             adiaV(:,ir) = Vadia(:)
         end do 
-        dr = (IALR%r_range(2) - IALR%r_range(1)) / real(IALR%vint + 1, f8)
-        range_rA = dr * (IALR%vasy + 1)
-        call DVR_calc(IALR%vasy,massBC,range_rA,adiaV,DVREig,DVRWF)
-        call PODVR(IALR%nr_PODVR,IALR%vasy,DVRWF,r_Asy,DVREig,IALR%jasy,massBC,r_PODVR,asyPO2DVR)
+        dr = (IALR%r_range(2) - IALR%r_range(1)) / real(IALR%nr_int + 1, f8)
+        range_rA = dr * (IALR%nr_asy + 1)
+        call DVR_calc(IALR%nr_asy,massBC,range_rA,adiaV,DVREig,DVRWF)
+        call PODVR(IALR%nr_PODVR,IALR%nr_asy,DVRWF,r_Asy,DVREig,IALR%vasy,IALR%jasy,massBC,r_PODVR,asyPO2DVR)
+
+        write(outFileUnit,'(1x,a,f15.9,a,f15.9,a)') 'PODVR grids range: [', r_PODVR(1), ', ', r_PODVR(IALR%nr_PODVR), '  ] a.u.'
+        write(outFileUnit,'(1x,a)') "Please ensure that the PODVR grid covers the relevant region of the BC potential!"
+        write(outFileUnit,*) ''
 
         normWF = 0.0_f8
         do ir = 1, IALR%nr_PODVR
@@ -177,15 +186,16 @@ contains
 !                    tmpDVRWF = matmul(asyPO2DVR, tmpPOWF)
 
 
-        do i = 1, nChannels
-            v = qn_channel(i,1)
-            j = qn_channel(i,2)
-            K = qn_channel(i,3)
+        do i = 1, nAsyChannels
+            v = qnAsy_channel(i,1)
+            j = qnAsy_channel(i,2)
+            K = qnAsy_channel(i,3)
             do ith = 1, IALR%jasy
                 cth = asyANode(ith)
                 wA = dsqrt(asyAWeight(ith))
-                YjK = spgndr(j,K,cth)
-                asyWFvjK(i,:,ith) = wA*YjK*asyBC_POWF(:,v,j)
+                PjK = spgndr(j,K,cth)
+                !> sqrt(w)*PjK(cth) is the transformation coefficient from FBR to DVR 
+                asyAdiaWFvjK(i,:,ith) = wA*YjK*asyBC_POWF(:,v,j)
             end do 
         end do
 
@@ -211,8 +221,8 @@ contains
         nchnl = Kmax - initWP%Kmin + 1
         allocate(lrWFvjK(nchnl,IALR%nr_PODVR,IALR%jasy))
         do K = initWP%Kmin, Kmax 
-            ichnl = seq_channel(initWP%v0,initWP%j0,K)
-            lrWFvjK(ichnl,:,:) = asyWFvjK(ichnl,:,:)
+            ichnl = seqAsy_channel(initWP%v0,initWP%j0,K)
+            lrWFvjK(ichnl,:,:) = asyAdiaWFvjK(ichnl,:,:)
         end do 
     
     end subroutine lrBC_vibRotThetaWF
@@ -252,25 +262,28 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine setChannel()
+    subroutine setChannel(vmax, jmax, nchnl, qn_channel, seq_channel)
         implicit none
+        integer, intent(in) :: vmax, jmax
+        integer, intent(out) :: nchnl 
+        integer, allocatable, intent(out) :: qn_channel(:,:), seq_channel(:,:,:)
         integer :: ichnl, v, j, K, Kmax
 
         ichnl = 0
-        do v = 0, IALR%nr_PODVR-1
-            do j = initWP%jmin, IALR%jasy, initWP%jinc
+        do v = 0, vmax 
+            do j = initWP%jmin, jmax, initWP%jinc
                 Kmax = min(j, initWP%Jtot)
                 do K = initWP%Kmin, Kmax
                     ichnl = ichnl + 1
                 end do
             end do
         end do
-        nChannels = ichnl
+        nchnl = ichnl
 
-        allocate(qn_channel(nChannels,3))
+        allocate(qn_channel(nchnl,3))
         ichnl = 0
-        do v = 0, IALR%nr_PODVR-1
-            do j = initWP%jmin, IALR%jasy, initWP%jinc
+        do v = 0, vmax 
+            do j = initWP%jmin, jmax, initWP%jinc
                 Kmax = min(j, initWP%Jtot)
                 do K = initWP%Kmin, Kmax
                     ichnl = ichnl + 1
@@ -281,10 +294,10 @@ contains
             end do
         end do
 
-        Kmax = min(initWP%Jtot,IALR%jasy)
-        allocate(seq_channel(0:IALR%vasy,initWP%jmin:IALR%jasy,initWP%Kmin:Kmax))
+        Kmax = min(initWP%Jtot,jmax)
+        allocate(seq_channel(0:vmax,initWP%jmin:jmax,initWP%Kmin:Kmax))
         seq_channel = -1
-        do ichnl = 1, nChannels
+        do ichnl = 1, nchnl
             v = qn_channel(ichnl,1)
             j = qn_channel(ichnl,2)
             K = qn_channel(ichnl,3)
@@ -350,7 +363,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, jmax, mass, POGrid,POTransMat)
+    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, vmax, jmax, mass, POGrid,POTransMat)
 !> Calculate the PODVR basis and eigenvalues/eigenfunctions for given DVR basis
 !> See Chemical Physics Letters 1992, 190 (3–4), 225–230.
         implicit none
@@ -358,7 +371,7 @@ contains
         real(f8), intent(in) :: DVRCoeff(:,:)
         real(f8), intent(in) :: DVRGrid(:)
         real(f8), intent(in) :: DVREig(:)
-        integer, intent(in) :: jmax
+        integer, intent(in) :: vmax, jmax
         real(f8), intent(in) :: mass
         real(f8), intent(inout) :: POGrid(:)
         real(f8), intent(inout) :: POTransMat(:,:)
@@ -394,9 +407,6 @@ contains
                 end do
             end do
         end block
-
-!> DVR to PODVR transformation matrix
-        asyPO2DVR = Xmat
 
         allocate(work(1))
         call dsyev('V', 'U', nPODVR, Xmat, nPODVR, POGrid, work, -1, info)
@@ -456,11 +466,11 @@ contains
                     call phaseTrans(nPODVR, EMat(:,i))
                 end do 
 
-                do qn_v = 0, nPODVR-1
+                do qn_v = 0, vmax 
                     asyBC_Evj(qn_v,qn_j) = POEig(qn_v+1)
                 end do
                 do i = 1, nPODVR
-                    do qn_v = 0, nPODVR-1
+                    do qn_v = 0, vmax 
                         asyBC_POWF(i,qn_v,qn_j) = EMat(i,qn_v+1)
                     end do
                 end do
