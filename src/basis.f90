@@ -125,9 +125,9 @@ contains
         allocate(asyANode(IALR%jasy))
         allocate(asyAWeight(IALR%jasy))
 !> Channel set as (v,j,K)
-        call setChannel(IALR%vasy,IALR%jasy,nAsyChannels,qnAsy_channel,seqAsy_channel)
+        call setChannel()
 !> Allocate wave function
-        allocate(asyAdiaWFvjK(nAsyChannels,IALR%nr_PODVR,IALR%jasy))
+        allocate(asyAdiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
 !        allocate(asyDiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
 !        allocate(tmp(IALR%nr_PODVR, IALR%vasy))
         call getANodeAndWeight(initWP%jpar, IALR%jasy, asyANode, asyAWeight)
@@ -185,11 +185,12 @@ contains
 !                    tmpPOWF(:) = asyBC_POWF(:,iv,ij)
 !                    tmpDVRWF = matmul(asyPO2DVR, tmpPOWF)
 
-
-        do i = 1, nAsyChannels
-            v = qnAsy_channel(i,1)
-            j = qnAsy_channel(i,2)
-            K = qnAsy_channel(i,3)
+        asyAdiaWFvjK = 0.0_f8
+        do i = 1, nChannels
+            v = qn_channel(i,1)
+            j = qn_channel(i,2)
+            K = qn_channel(i,3)
+            if (v > IALR%vasy .or. j > IALR%jasy) cycle 
             do ith = 1, IALR%jasy
                 cth = asyANode(ith)
                 wA = dsqrt(asyAWeight(ith))
@@ -221,7 +222,7 @@ contains
         nchnl = Kmax - initWP%Kmin + 1
         allocate(lrWFvjK(nchnl,IALR%nr_PODVR,IALR%jasy))
         do K = initWP%Kmin, Kmax 
-            ichnl = seqAsy_channel(initWP%v0,initWP%j0,K)
+            ichnl = seq_channel(initWP%v0,initWP%j0,K)
             lrWFvjK(ichnl,:,:) = asyAdiaWFvjK(ichnl,:,:)
         end do 
     
@@ -262,28 +263,25 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine setChannel(vmax, jmax, nchnl, qn_channel, seq_channel)
+    subroutine setChannel()
         implicit none
-        integer, intent(in) :: vmax, jmax
-        integer, intent(out) :: nchnl 
-        integer, allocatable, intent(out) :: qn_channel(:,:), seq_channel(:,:,:)
         integer :: ichnl, v, j, K, Kmax
 
         ichnl = 0
-        do v = 0, vmax 
-            do j = initWP%jmin, jmax, initWP%jinc
+        do v = 0, IALR%vint  
+            do j = initWP%jmin, IALR%jint, initWP%jinc
                 Kmax = min(j, initWP%Jtot)
                 do K = initWP%Kmin, Kmax
                     ichnl = ichnl + 1
                 end do
             end do
         end do
-        nchnl = ichnl
+        nChannels = ichnl
 
-        allocate(qn_channel(nchnl,3))
+        allocate(qn_channel(nChannels,3))
         ichnl = 0
-        do v = 0, vmax 
-            do j = initWP%jmin, jmax, initWP%jinc
+        do v = 0, IALR%vint 
+            do j = initWP%jmin, IALR%jint, initWP%jinc
                 Kmax = min(j, initWP%Jtot)
                 do K = initWP%Kmin, Kmax
                     ichnl = ichnl + 1
@@ -295,9 +293,9 @@ contains
         end do
 
         Kmax = min(initWP%Jtot,jmax)
-        allocate(seq_channel(0:vmax,initWP%jmin:jmax,initWP%Kmin:Kmax))
+        allocate(seq_channel(0:IALR%vint,initWP%jmin:IALR%jint,initWP%Kmin:Kmax))
         seq_channel = -1
-        do ichnl = 1, nchnl
+        do ichnl = 1, nChannels
             v = qn_channel(ichnl,1)
             j = qn_channel(ichnl,2)
             K = qn_channel(ichnl,3)

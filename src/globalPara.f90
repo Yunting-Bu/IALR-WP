@@ -3,7 +3,7 @@ module gPara
     implicit none
     public
 
-    private :: getMass, diatomParity
+    private :: getMass, diatomParity, energySet
 
 !> ========== Constants ==========
 
@@ -68,6 +68,9 @@ module gPara
     real(f8) :: E_range(2), dE
     real(f8), allocatable :: Etot(:)
     real(f8) :: energyUnitTrans(4) = [cm2au, ev2au, K2au, 1.0_f8]
+!> Wave number in reactant coordinate
+    real(f8), allocatable :: kReact(:)
+    complex(c8), allocatable :: energyAM(:)
 !> Atoms and masses
     real(f8) :: atomMass(3), massBC, massTot
     character(len=2) :: Atoms(3)
@@ -79,9 +82,8 @@ module gPara
     character(len=1) :: IDflux 
     real(f8) :: fluxPos
 !> Channels
-    integer :: nAsyChannels
-    integer, allocatable :: qnAsy_channel(:,:)
-    integer, allocatable :: seqAsy_channel(:,:,:)
+    integer :: nChannels
+    integer, allocatable :: qn_channel(:,:)
 !> I - interaction region
 !> A - asymptotic region
 !> LR - long range region
@@ -117,8 +119,12 @@ module gPara
 !> Hamiltonian matrix
     real(f8), allocatable :: Z_KinMat(:,:), r_KinMat(:,:)
     real(f8), allocatable :: rotMat(:,:)
-    real(f8), allocatable :: CPMat(:,:)
+    real(f8), allocatable :: CPDiag(:,:,:), CPKPlus(:,:,:), CPKMinus(:,:,:)
     real(f8), allocatable :: Vmat(:,:,:) 
+!> Wave packet during propagation
+    complex(c8), allocatable :: lrWP(:,:,:,:,:)
+    complex(c8), allocatable :: asyWP(:,:,:,:,:)
+    complex(c8), allocatable :: intWP(:,:,:,:,:)
 !> Product channel grids
     real(f8), allocatable :: rp1(:)
     real(f8), allocatable :: rp2(:)
@@ -148,8 +154,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine initPara()
         implicit none
-        integer :: iEtot, inpFileUnit
-        real(f8) :: temp
+        integer :: inpFileUnit
 
 !> ========== Read parameters from input file ==========
 
@@ -172,21 +177,6 @@ contains
         
         open(newunit=outFileUnit, file=trim(outfile)//".out", status='replace')
         !> Should add more output files later
-
-!> ========== Construct collision energy ==========
-
-        nEtot = nint((E_range(2) - E_range(1))/dE)
-        allocate(Etot(nEtot))
-        temp = E_range(1)
-        do iEtot = 1, nEtot 
-            Etot(iEtot) = temp + dE 
-            if (Etot(iEtot) > E_range(2)) then
-                Etot(iEtot) = E_range(2)
-            end if 
-            !> convert to au
-            Etot(iEtot) = Etot(iEtot) * energyUnitTrans(energyUnit)
-        end do
-        initWP%Ec = initWP%Ec * energyUnitTrans(energyUnit)
 
         if (initWP%tpar == 1) then 
             initWP%Kmin = 0
@@ -218,6 +208,7 @@ contains
 
         call getMass()
         call diatomParity()
+        call energySet()
 
 !> Allocate channel rp grids
         allocate(rp1(channel1%nrp))
@@ -235,10 +226,33 @@ contains
         write(outFileUnit,'(1x,a,i4)') "Total angular momentum Jtot: ", initWP%Jtot
         write(outFileUnit,'(1x,a,i4)') "Total parity: ", initWP%tpar
         write(outFileUnit,'(1x,a,i4)') "Number of PESs: ", nPES
-        
-
 
     end subroutine initPara
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine energySet()
+        implicit none
+        integer :: iEtot
+        real(f8) :: temp
+!> ========== Construct collision energy ==========
+
+        nEtot = nint((E_range(2) - E_range(1))/dE)
+        allocate(Etot(nEtot),kReact(nEtot))
+        allocate(energyAM(nEtot))
+        temp = E_range(1)
+        do iEtot = 1, nEtot 
+            Etot(iEtot) = temp + dE 
+            if (Etot(iEtot) > E_range(2)) then
+                Etot(iEtot) = E_range(2)
+            end if 
+            !> convert to au
+            Etot(iEtot) = Etot(iEtot) * energyUnitTrans(energyUnit)
+            kReact(iEtot) = dsqrt(2.0_f8*massTot*Etot(iEtot))
+        end do
+        initWP%Ec = initWP%Ec * energyUnitTrans(energyUnit)
+
+    end subroutine energySet
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
