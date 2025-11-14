@@ -114,6 +114,11 @@ module gPara
 !> Interaction potential matrix and diabatic-to-adiabatic transformation matrix
     real(f8), allocatable :: INT_Vadia(:,:,:,:), INT_AtD(:,:,:,:,:)
     real(f8), allocatable :: ALR_Vadia(:,:,:,:), ALR_AtD(:,:,:,:,:)
+!> Hamiltonian matrix
+    real(f8), allocatable :: Z_KinMat(:,:), r_KinMat(:,:)
+    real(f8), allocatable :: rotMat(:,:)
+    real(f8), allocatable :: CPMat(:,:)
+    real(f8), allocatable :: Vmat(:,:,:) 
 !> Product channel grids
     real(f8), allocatable :: rp1(:)
     real(f8), allocatable :: rp2(:)
@@ -181,6 +186,7 @@ contains
             !> convert to au
             Etot(iEtot) = Etot(iEtot) * energyUnitTrans(energyUnit)
         end do
+        initWP%Ec = initWP%Ec * energyUnitTrans(energyUnit)
 
         if (initWP%tpar == 1) then 
             initWP%Kmin = 0

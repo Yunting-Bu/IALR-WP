@@ -195,7 +195,7 @@ contains
                 wA = dsqrt(asyAWeight(ith))
                 PjK = spgndr(j,K,cth)
                 !> sqrt(w)*PjK(cth) is the transformation coefficient from FBR to DVR 
-                asyAdiaWFvjK(i,:,ith) = wA*YjK*asyBC_POWF(:,v,j)
+                asyAdiaWFvjK(i,:,ith) = wA*PjK*asyBC_POWF(:,v,j)
             end do 
         end do
 
