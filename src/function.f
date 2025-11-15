@@ -547,7 +547,8 @@ CU    USES chebev
 
 
 
-      subroutine rbesjy (ell,x,z,zp,zu,zup,cj,dj,ej,cy,dy,ey)
+!      subroutine rbesjy (ell,x,z,zp,zu,zup,cj,dj,ej,cy,dy,ey)
+      subroutine rbesjy (ell,x,z,zp,zu,zup)
       implicit double precision (a-h,o-z)
 c
 c     ----------------------------------------------------------------- 

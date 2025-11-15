@@ -17,6 +17,7 @@ module gPara
     real(f8), parameter :: pi = 4.0_f8*atan(1.0_f8)
     real(f8), parameter :: one = 1.0_f8
     real(c8), parameter :: img = (0.0_f8, 1.0_f8)
+    real(c8), parameter :: imgZore = (0.0_f8, 0.0_f8)
    
 !> ========== Global Parameters ==========
 
@@ -84,6 +85,7 @@ module gPara
 !> Channels
     integer :: nChannels
     integer, allocatable :: qn_channel(:,:)
+    integer, allocatable :: seq_channel(:,:,:)
 !> I - interaction region
 !> A - asymptotic region
 !> LR - long range region
@@ -117,7 +119,7 @@ module gPara
     real(f8), allocatable :: INT_Vadia(:,:,:,:), INT_AtD(:,:,:,:,:)
     real(f8), allocatable :: ALR_Vadia(:,:,:,:), ALR_AtD(:,:,:,:,:)
 !> Hamiltonian matrix
-    real(f8), allocatable :: Z_KinMat(:,:), r_KinMat(:,:)
+    real(f8), allocatable :: Z_KinMat(:), r_KinMat(:)
     real(f8), allocatable :: rotMat(:,:)
     real(f8), allocatable :: CPDiag(:,:,:), CPKPlus(:,:,:), CPKMinus(:,:,:)
     real(f8), allocatable :: Vmat(:,:,:) 
@@ -216,7 +218,8 @@ contains
 
 !> ========== Output ==========
 
-        write(outFileUnit,'(1x,a)') " ============= Input Parameters ============="
+        write(outFileUnit,'(1x,a)') " =====> Input parameters ======<"
+        write(outFileUnit,'(1x,a)') ''
         write(outFileUnit,'(1x,a,a,a)') "Reaction Channel: ", &
             merge("A + BC -> AB + C           ", "A + BC -> AB + C and AC + B", reactChannel==1)
         write(outFileUnit,'(1x,6a)') "Atoms A, B, C: ", Atoms(1),', ', Atoms(2),', ', Atoms(3)
@@ -225,7 +228,8 @@ contains
         write(outFileUnit,'(1x,a,3i4)') "v0, j0, l0 : ", initWP%v0, initWP%j0, initWP%l0
         write(outFileUnit,'(1x,a,i4)') "Total angular momentum Jtot: ", initWP%Jtot
         write(outFileUnit,'(1x,a,i4)') "Total parity: ", initWP%tpar
-        write(outFileUnit,'(1x,a,i4)') "Number of PESs: ", nPES
+        write(outFileUnit,'(1x,a,i4)') "Number of PES: ", nPES
+        write(outFileUnit,'(1x,a)') ''
 
     end subroutine initPara
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -234,15 +238,13 @@ contains
     subroutine energySet()
         implicit none
         integer :: iEtot
-        real(f8) :: temp
 !> ========== Construct collision energy ==========
 
-        nEtot = nint((E_range(2) - E_range(1))/dE)
+        nEtot = int((E_range(2) - E_range(1))/dE) + 1
         allocate(Etot(nEtot),kReact(nEtot))
         allocate(energyAM(nEtot))
-        temp = E_range(1)
         do iEtot = 1, nEtot 
-            Etot(iEtot) = temp + dE 
+            Etot(iEtot) = E_range(1) + (iEtot-1)*dE 
             if (Etot(iEtot) > E_range(2)) then
                 Etot(iEtot) = E_range(2)
             end if 

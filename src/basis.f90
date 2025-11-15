@@ -158,6 +158,8 @@ contains
         call DVR_calc(IALR%nr_asy,massBC,range_rA,adiaV,DVREig,DVRWF)
         call PODVR(IALR%nr_PODVR,IALR%nr_asy,DVRWF,r_Asy,DVREig,IALR%vasy,IALR%jasy,massBC,r_PODVR,asyPO2DVR)
 
+        write(outFileUnit,'(1x,a)') '=====> Initail ro-vibrational state information <====='
+        write(outFileUnit,'(1x,a)') ''
         write(outFileUnit,'(1x,a,f15.9,a,f15.9,a)') 'PODVR grids range: [', r_PODVR(1), ', ', r_PODVR(IALR%nr_PODVR), '  ] a.u.'
         write(outFileUnit,'(1x,a)') "Please ensure that the PODVR grid covers the relevant region of the BC potential!"
         write(outFileUnit,*) ''
@@ -167,14 +169,13 @@ contains
             normWF = normWF + asyBC_POWF(ir,initWP%v0,initWP%j0)**2
         end do 
 
-        write(outFileUnit,'(1x,a)') '==================================================================================='
-        write(outFileUnit,'(1x,a,2i2,a)') 'Initial ro-vibrational energy of (v0, j0) = ', initWP%v0, initWP%j0, ' state.'
+        write(outFileUnit,'(1x,a,2i2,a)') 'Initial ro-vibrational energy of (v0, j0) = (', initWP%v0, initWP%j0, ') state.'
         write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2ev, ' eV.'
         write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2cm, ' cm-1.'
         write(outFileUnit,'(1x,a)') 'Please check the energy!'
         write(outFileUnit,*) ''
         write(outFileUnit,'(1x,a,f15.9)') 'Initial ro-vibrational wave function normalization check: ', normWF
-        write(outFileUnit,'(1x,a)') '==================================================================================='
+        write(outFileUnit,'(1x,a)') ''
 
         !block 
         !    real(f8) :: tmpDVRWF(IALR%vasy), tmpPOWF(IALR%nr_PODVR)
@@ -292,7 +293,7 @@ contains
             end do
         end do
 
-        Kmax = min(initWP%Jtot,jmax)
+        Kmax = min(initWP%Jtot,IALR%jint)
         allocate(seq_channel(0:IALR%vint,initWP%jmin:IALR%jint,initWP%Kmin:Kmax))
         seq_channel = -1
         do ichnl = 1, nChannels

@@ -33,20 +33,16 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine Z_initGaussWP()
         implicit none
-        real(f8) :: normWP
         integer :: iZ 
 
         allocate(initGaussWP(IALR%nZ_IALR))
 
 !> Gaussian wave-packet in DVR representation
-        normWP = 0.0_f8
         do iZ = 1, IALR%nZ_IALR
             initGaussWP(iZ) = GaussianWavePacket(initWP%Ec,initWP%delta,initWP%Zc,massTot,Z_IALR(iZ)) &
                               * dsqrt(Z_IALR(2)-Z_IALR(1))
-            normWP = normWP + abs(initGaussWP(iZ))**2
         end do 
 
-        write(outFileUnit,'(1x,a,f15.9)') 'Initial Gaussian wave-packet normalization check: ', normWP
 
     end subroutine Z_initGaussWP
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -54,6 +50,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine getAdiaInitTotWP()
         implicit none
+        real(f8) :: normWPTot, normWPZ
         integer :: ir, iZ, iPES, ith 
         integer :: Kmax, K, ichnl, nchnl
 
@@ -79,6 +76,15 @@ contains
                 end do 
             end do 
         end do
+
+        write(outFileUnit,'(1x,a)') "=====> Initial WP infromation <====="
+        write(outFileUnit,'(1x,a)') ''
+        write(outFileUnit,'(1x,a,f15.9,a,f15.9,a,f15.9)') 'Z0 = ', initWP%Zc, ' , E0 = ', initWP%Ec, ' , delta = ', initWP%delta
+        normWPTot = sum( abs(initAdiaTotWP)**2 )
+        normWPZ = sum( abs(initGaussWP)**2 )
+        write(outFileUnit,'(1x,a,f15.9)') 'Initial Gaussian wave-packet normalization check: ', normWPZ
+        write(outFileUnit,'(1x,a,f15.9)') 'Initial adiabatic total wave-packet normalization check: ', normWPTot
+        write(outFileUnit,'(1x,a)') ''
 
     end subroutine getAdiaInitTotWP
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -107,12 +113,42 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-!    subroutine getEnergyAM()
-!        implicit none
-!        integer
+    subroutine getEnergyAM()
+        implicit none
+        !> For Ricatti-Bessel function 
+        real(f8) :: rbZ, rbZU, rbZP, rbZUP 
+        real(f8) :: fact, wZ
+        !> Phase for trans the Bessel to Hankel
+        complex(c8) :: phase
+        integer :: iZ, iEtot
 
-        
+        fact = dsqrt(massTot/(2.0_f8*pi))
+        phase = exp(-img*pi*0.5_f8*initWP%l0)
+        wZ = dsqrt(Z_IALR(2)-Z_IALR(1))
 
+        do iEtot = 1, nEtot
+            energyAM(iEtot) = imgZore
+            do iZ = 1, IALR%nZ_IALR
+                call rbesjy(initWP%l0*1.0_f8, kReact(iEtot)*Z_IALR(iZ), rbZ, rbZP, rbZU, rbZUP)
+                energyAM(iEtot) = energyAM(iEtot) + fact/dsqrt(kReact(iEtot)) * &
+                                  phase * (-rbZU+img*rbZ) * wZ * initGaussWP(iZ)
+            end do 
+        end do
+
+        write(outFileUnit,*) ''
+        write(outFileUnit,'(1x,a)') '=====> Energy information <====='
+        write(outFileUnit,'(1x,a)') ''
+        write(outFileUnit,'(1x,a5,3x,a20,3x,a20,3x,a20,3x,a20)') 'nEtot','Etot', 'Wave Number', 'Amplitude (real)', 'Amplitude (img)'
+        write(outFileUnit,'(1x,5("-"),3x,20("-"),3x,20("-"),3x,20("-"),3x,20("-"))')
+        do iEtot = 1, nEtot
+            write(outFileUnit,'(1x,i5,3x,f20.10,3x,f20.10,3x,f20.10,3x,f20.10)') iEtot, Etot(iEtot)*au2ev, kReact(iEtot)*au2ev, &
+                                                             energyAM(iEtot)%re*au2ev, energyAM(iEtot)%im*au2ev
+        end do 
+        write(outFileUnit,*) ''
+
+    end subroutine getEnergyAM
+!> ------------------------------------------------------------------------------------------------------------------ <!
+                                  
 !> ------------------------------------------------------------------------------------------------------------------ <!
     complex(c8) function GaussianWavePacket(E0, delta, Z0, mass, Z) result(WP)
         implicit none
@@ -124,7 +160,7 @@ contains
         fact = (2.0_f8/(pi*delta*delta))**(0.25)
         realPart = -(Z-Z0)**2 / delta**2
         imgPart = Z * dsqrt(2.0_f8*E0*mass)
-        WP = fact*dexp(realPart-img*imgPart)
+        WP = fact * exp( cmplx(realPart, -imgPart, kind=c8) )
 
         return
     end function GaussianWavePacket

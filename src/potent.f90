@@ -123,7 +123,8 @@ contains
     subroutine initAllVabs()
         implicit none
 
-        write(outFileUnit,'(1x,a)') '----------  Vasb ----------'
+        write(outFileUnit,'(1x,a)') '=====> Vasb information <====='
+        write(outFileUnit,'(1x,a)') ''
 !> Vabs in r
         allocate(Fabs(IALR%nr_int))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in r:'
@@ -137,7 +138,7 @@ contains
         write(outFileUnit,'(1x,a)') 'Absorbing potential in Z_asy:'
         write(outFileUnit,'(1x,a)') 'Note that the Vabs only works for the channel with (v, j, iPES) /= (v0, j0, initPES)!'
         call getVabs(Vabs%Zasy_range,Vabs%Casy,IALR%nZ_IA,Z_IA,timeStep,Vabs%nZasy,Fasy)
-        write(outFileUnit,'(1x,a)') '---------------------------'
+        write(outFileUnit,'(1x,a)') ''
 
     end subroutine initAllVabs
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -196,6 +197,8 @@ contains
 !> Interaction potential in the interaction region
         allocate(INT_Vadia(nPES,IALR%nZ_I,IALR%nr_int,IALR%jint))
         allocate(INT_AtD(nPES,nPES,IALR%nZ_I,IALR%nr_int,IALR%jint))
+        write(outFileUnit,'(1x,a)') '=====> Interaction potential information <====='
+        write(outFileUnit,'(1x,a)') ''
         type = 'INT'
         if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the interaction region...'
@@ -240,6 +243,7 @@ contains
             write(outFileUnit,'(1x,a)') 'POSITION: potent.f90, subroutine getIntPot()'
             stop
         end if
+        write(outFileUnit,'(1x,a)') ''
 
         deallocate(Z_ALR)
 

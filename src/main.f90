@@ -4,6 +4,7 @@ program IALR_WP_SO
     use potentMod
     use basisMod
     use initWPMod
+    use propMod
     implicit none
 
 !> Test
@@ -12,5 +13,9 @@ program IALR_WP_SO
     call getAdiaInitTotWP()
     call initAllVabs()
     call getIntPot()
+    call getEnergyAM()
+    call getKinMat()
+    call getRotMat()
+    call getCPMat()
     
 end program IALR_WP_SO
