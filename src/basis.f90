@@ -116,9 +116,8 @@ contains
         real(f8), allocatable :: adiaV(:,:)
         real(f8), allocatable :: DVREig(:)
         real(f8), allocatable :: DVRWF(:,:), asyDiaPOWF(:,:,:), asyDVRWF(:,:,:)
-        real(f8) :: wA, cth, PjK, normWF, dr, range_rA
-        real(f8), external :: spgndr
-        integer :: ir, v, j, K, i, ith
+        real(f8) :: normWF, dr, range_rA
+        integer :: ir, v, j, K, i
         integer :: normWFunit
 
 !> Allocate asympotic range angular quadrature grids and weights
@@ -127,8 +126,8 @@ contains
 !> Channel set as (v,j,K)
         call setChannel()
 !> Allocate wave function
-        allocate(asyAdiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
-!        allocate(asyDiaWFvjK(nChannels,IALR%nr_PODVR,IALR%jasy))
+        allocate(asyAdiaWFvjK(nChannels,IALR%nr_PODVR))
+!        allocate(asyDiaWFvjK(nChannels,IALR%nr_PODVR))
 !        allocate(tmp(IALR%nr_PODVR, IALR%vasy))
         call getANodeAndWeight(initWP%jpar, IALR%jasy, asyANode, asyAWeight)
 
@@ -138,7 +137,7 @@ contains
         allocate(asyBC_AtDMat(nPES,IALR%nr_asy))
         allocate(asyBC_Evj(0:IALR%vasy,0:IALR%jasy))
         allocate(r_PODVR(IALR%nr_PODVR))
-        allocate(asyPO2DVR(IALR%nr_asy,IALR%nr_PODVR))
+        allocate(asyPO2FBR(IALR%nr_PODVR,IALR%nr_PODVR))
 !        allocate(asyDVRWF(IALR%nr_asy, 0:IALR%nr_PODVR-1,0:IALR%jasy))
         allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%vasy,0:IALR%jasy))
 !        allocate(asyDiaPOWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
@@ -192,13 +191,7 @@ contains
             j = qn_channel(i,2)
             K = qn_channel(i,3)
             if (v > IALR%vasy .or. j > IALR%jasy) cycle 
-            do ith = 1, IALR%jasy
-                cth = asyANode(ith)
-                wA = dsqrt(asyAWeight(ith))
-                PjK = spgndr(j,K,cth)
-                !> sqrt(w)*PjK(cth) is the transformation coefficient from FBR to DVR 
-                asyAdiaWFvjK(i,:,ith) = wA*PjK*asyBC_POWF(:,v,j)
-            end do 
+            asyAdiaWFvjK(i,:) = asyBC_POWF(:,v,j)
         end do
 
         deallocate(adiaV, DVREig, DVRWF, asyBC_AtDMat)
@@ -221,10 +214,10 @@ contains
 
         Kmax = min(initWP%Jtot,initWP%j0)
         nchnl = Kmax - initWP%Kmin + 1
-        allocate(lrWFvjK(nchnl,IALR%nr_PODVR,IALR%jasy))
+        allocate(lrWFvjK(nchnl,IALR%nr_PODVR))
         do K = initWP%Kmin, Kmax 
             ichnl = seq_channel(initWP%v0,initWP%j0,K)
-            lrWFvjK(ichnl,:,:) = asyAdiaWFvjK(ichnl,:,:)
+            lrWFvjK(ichnl,:) = asyAdiaWFvjK(ichnl,:)
         end do 
     
     end subroutine lrBC_vibRotThetaWF
@@ -362,7 +355,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, vmax, jmax, mass, POGrid,POTransMat)
+    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, vmax, jmax, mass, POGrid)
 !> Calculate the PODVR basis and eigenvalues/eigenfunctions for given DVR basis
 !> See Chemical Physics Letters 1992, 190 (3–4), 225–230.
         implicit none
@@ -373,9 +366,8 @@ contains
         integer, intent(in) :: vmax, jmax
         real(f8), intent(in) :: mass
         real(f8), intent(inout) :: POGrid(:)
-        real(f8), intent(inout) :: POTransMat(:,:)
         real(f8) :: POEig(nPODVR)
-        real(f8) :: Xmat(nPODVR,nPODVR), HRefMat(nPODVR,nPODVR), EMat(nPODVR,nPODVR)
+        real(f8) :: POTransMat(nDVR,nPODVR), HRefMat(nPODVR,nPODVR), EMat(nPODVR,nPODVR), Xmat(nPODVR,nPODVR)
         real(f8), allocatable :: work(:)
         integer :: i, j, l, info, lwork
 
@@ -460,6 +452,8 @@ contains
                     stop
                 end if
                 deallocate(work)
+
+                asyPO2FBR = Xmat
 
                 do i = 1, nPODVR
                     call phaseTrans(nPODVR, EMat(:,i))

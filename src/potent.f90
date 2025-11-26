@@ -223,12 +223,12 @@ contains
         allocate(Z_ALR(nZ_ALR))
         Z_ALR(1:IALR%nZ_IA) = Z_IALR(IALR%nZ_I+1:IALR%nZ_IALR)
 
-        allocate(ALR_Vadia(nPES,nZ_ALR,IALR%nr_asy,IALR%jasy))
-        allocate(ALR_AtD(nPES,nPES,nZ_ALR,IALR%nr_asy,IALR%jasy))
+        allocate(ALR_Vadia(nPES,nZ_ALR,IALR%nr_PODVR,IALR%jasy))
+        allocate(ALR_AtD(nPES,nPES,nZ_ALR,IALR%nr_PODVR,IALR%jasy))
         type = 'ALR'
         if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the asymptotic and long-range region...'
-            call interactionPot(nZ_ALR, IALR%nr_asy, IALR%jasy, Z_ALR, r_Asy, asyANode, type, ALR_Vadia, ALR_AtD)
+            call interactionPot(nZ_ALR, IALR%nr_PODVR, IALR%jasy, Z_ALR, r_PODVR, asyANode, type, ALR_Vadia, ALR_AtD)
         else if (trim(potentialType) == 'Read') then 
 
             fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'

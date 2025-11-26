@@ -45,7 +45,7 @@
 
 ! Parameters for propagation
 &propagation
-    timeTot             = 1000000                   ! Total propagation time
+    timeTot           = 1000000                     ! Total propagation time
     timeStep          = 10                          ! Time step for propagation
     timePrint         = 1000                        ! Time interval for printing
 /
@@ -54,6 +54,7 @@
 &energy
     E_range           = 0.01, 1.0                   ! Energy range
     dE                = 0.01                        ! Energy step
+    CPCut             = 6.0                         ! The cut energy of CPE when Z is very small 
 /
 
 ! Absorbing potential parameters

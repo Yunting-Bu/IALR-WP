@@ -62,17 +62,15 @@ contains
         Kmax = min(initWP%j0, initWP%Jtot)
         nchnl = Kmax - initWP%Kmin + 1
         allocate(initWP_BLK(0:0,initWP%Kmin:Kmax))
-        allocate(initAdiaTotWP(nPES,IALR%nZ_IALR,IALR%nr_PODVR,IALR%jasy,nchnl))
+        allocate(initAdiaTotWP(nPES,IALR%nZ_IALR,IALR%nr_PODVR,nchnl))
 
         call SF2BFMat(initWP%l0,initWP%l0,initWP%Kmin,Kmax,initWP%j0,initWP%Jtot)
 !> Construct initial WP in adiabatic representation
         do iZ = 1, IALR%nZ_IALR
             do ir = 1, IALR%nr_PODVR
-                do ith = 1, IALR%jasy 
-                    do K = initWP%Kmin, Kmax 
-                        ichnl = seq_channel(initWP%v0,initWP%j0,K)
-                        initAdiaTotWP(:,iZ,ir,ith,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir,ith)*initWP_BLK(initWP%l0,K)
-                    end do 
+                do K = initWP%Kmin, Kmax 
+                    ichnl = seq_channel(initWP%v0,initWP%j0,K)
+                    initAdiaTotWP(:,iZ,ir,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir)*initWP_BLK(initWP%l0,K)
                 end do 
             end do 
         end do
@@ -103,9 +101,7 @@ contains
         do iPES = 1, nPES
             do iZ = 1, IALR%nZ_IALR
                 do ir = 1, IALR%nr_PODVR
-                    do ith = 1, IALR%jasy 
-                        initDiaTotWP(iPES,iZ,ir,ith,:) = initAdiaTotWP(iPES,iZ,ir,ith,:) * asyBC_AtDMat(iPES,ir)
-                    end do 
+                        initDiaTotWP(iPES,iZ,ir,:) = initAdiaTotWP(iPES,iZ,ir,:) * asyBC_AtDMat(iPES,ir)
                 end do 
             end do 
         end do
@@ -150,17 +146,17 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
                                   
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    complex(c8) function GaussianWavePacket(E0, delta, Z0, mass, Z) result(WP)
+    real(f8) function GaussianWavePacket(E0, delta, Z0, mass, Z) result(WP)
         implicit none
         real(f8), intent(in) :: E0, delta, Z0, mass, Z
-        real(f8) :: fact, realPart, imgPart 
+        real(f8) :: fact, expPart, cosPart 
 
 !> Since we use SO method
 !> The WP isn't real packet
         fact = (2.0_f8/(pi*delta*delta))**(0.25)
-        realPart = -(Z-Z0)**2 / delta**2
-        imgPart = Z * dsqrt(2.0_f8*E0*mass)
-        WP = fact * exp( cmplx(realPart, -imgPart, kind=c8) )
+        expPart = -(Z-Z0)**2 / delta**2
+        cosPart = Z * dsqrt(2.0_f8*E0*mass)
+        WP = fact * exp(expPart)*cos(cosPart)
 
         return
     end function GaussianWavePacket

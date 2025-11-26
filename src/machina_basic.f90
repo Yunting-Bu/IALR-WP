@@ -25,7 +25,7 @@ module machina_basic
     ! kind specifier of 16 byte complex
     integer, parameter :: c16 = real128
 
-    type, public :: FFTClass
+    type, public :: DSTClass
         type(DFTI_DESCRIPTOR), pointer :: handle => null()
         integer :: err 
     contains 
@@ -33,7 +33,7 @@ module machina_basic
         procedure :: forward 
         procedure :: backward 
         procedure :: destroy
-    end type FFTClass
+    end type DSTClass
 
     interface BinReadWrite
         module procedure realBinReadWrite4D
@@ -95,7 +95,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine create(this, n)
         implicit none
-        class(FFTClass) :: this
+        class(CSTClass) :: this
         integer, intent(in) :: n
 
         this%err = DftiCreateDescriptor(this%handle, DFTI_DOUBLE, DFTI_COMPLEX, 1, n)
@@ -105,29 +105,29 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine forward(this, Data)
+    subroutine forward(this, DataF)
         implicit none
-        class(FFTClass) :: this 
-        complex(c8), intent(inout) :: Data(:)
+        class(CSTClass) :: this 
+        complex(c8), intent(inout) :: DataF(:)
 
-        this%err = DftiComputeForward(this%handle, Data)
+        this%err = DftiComputeForward(this%handle, DataF)
     end subroutine forward
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine backward(this, Data)
+    subroutine backward(this, DataI)
         implicit none
-        class(FFTClass) :: this 
-        complex(c8), intent(inout) :: Data(:)
+        class(CSTClass) :: this 
+        complex(c8), intent(inout) :: DataI(:)
 
-        this%err = DftiComputeBackward(this%handle, Data)
+        this%err = DftiComputeBackward(this%handle, DataI)
     end subroutine backward
 !> ------------------------------------------------------------------------------------------------------------------ <!
     
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine destroy(this)
         implicit none
-        class(FFTClass) :: this 
+        class(CSTClass) :: this 
 
         this%err = DftiFreeDescriptor(this%handle)
     end subroutine destroy

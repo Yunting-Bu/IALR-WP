@@ -66,7 +66,7 @@ module gPara
     integer :: timeTot, timeStep, timePrint
 !> Energy input
     integer :: nEtot, outFileUnit
-    real(f8) :: E_range(2), dE
+    real(f8) :: E_range(2), dE, CPCut 
     real(f8), allocatable :: Etot(:)
     real(f8) :: energyUnitTrans(4) = [cm2au, ev2au, K2au, 1.0_f8]
 !> Wave number in reactant coordinate
@@ -92,26 +92,26 @@ module gPara
 !> B for DVR-FBR transformation matrix
     real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_Int(:), r_Asy(:)
     real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rInt(:,:), B_rAsy(:,:)
-    real(f8), allocatable :: r_PODVR(:), asyPO2DVR(:,:)
+    real(f8), allocatable :: r_PODVR(:), asyPO2FBR(:,:)
 !> Grids and weights for K independent Gauss-Legendre quadrature
     real(f8), allocatable :: asyANode(:), asyAWeight(:)
 !> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in asymptotic range
-    real(f8), allocatable :: asyAdiaWFvjK(:,:,:)
-    real(f8), allocatable :: asyDiaWFvjK(:,:,:)
+    real(f8), allocatable :: asyAdiaWFvjK(:,:)
+    real(f8), allocatable :: asyDiaWFvjK(:,:)
     real(f8), allocatable :: asyBC_Evj(:,:)
     real(f8), allocatable :: asyBC_POWF(:,:,:)
 !> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in long-range
 !> Only have one state (v0, j0)
     real(f8) :: lrBC_Evj
-    real(f8), allocatable :: lrWFvjK(:,:,:)
+    real(f8), allocatable :: lrWFvjK(:,:)
     real(f8), allocatable :: lrBC_POWF(:)
     real(f8), allocatable :: asyBC_AtDMat(:,:)
 !> FBR in theta, Z_int
     real(f8), allocatable :: intANode(:), intAWeight(:)
 !> Initial Gaussian-shape WP and initial total WP
-    complex(c8), allocatable :: initGaussWP(:)
-    complex(c8), allocatable :: initAdiaTotWP(:,:,:,:,:)
-    complex(c8), allocatable :: initDiaTotWP(:,:,:,:,:)
+    real(f8), allocatable :: initGaussWP(:)
+    real(f8), allocatable :: initAdiaTotWP(:,:,:,:)
+    real(f8), allocatable :: initDiaTotWP(:,:,:,:)
     real(f8), allocatable :: initWP_BLK(:,:)
 !> Vabs
     real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
@@ -119,14 +119,15 @@ module gPara
     real(f8), allocatable :: INT_Vadia(:,:,:,:), INT_AtD(:,:,:,:,:)
     real(f8), allocatable :: ALR_Vadia(:,:,:,:), ALR_AtD(:,:,:,:,:)
 !> Hamiltonian matrix
-    real(f8), allocatable :: Z_KinMat(:), r_KinMat(:)
+    real(f8), allocatable :: Z_KinMat(:,:), r_KinMat(:,:)
+!    real(f8), allocatable :: Z_KinMat(:), r_KinMat(:)
     real(f8), allocatable :: rotMat(:,:)
-    real(f8), allocatable :: CPDiag(:,:,:), CPKPlus(:,:,:), CPKMinus(:,:,:)
+    real(f8), allocatable :: CPMat(:,:,:)
     real(f8), allocatable :: Vmat(:,:,:) 
 !> Wave packet during propagation
-    complex(c8), allocatable :: lrWP(:,:,:,:,:)
-    complex(c8), allocatable :: asyWP(:,:,:,:,:)
-    complex(c8), allocatable :: intWP(:,:,:,:,:)
+    real(f8), allocatable :: lrWP(:,:,:,:)
+    real(f8), allocatable :: asyWP(:,:,:,:)
+    real(f8), allocatable :: intWP(:,:,:,:)
 !> Product channel grids
     real(f8), allocatable :: rp1(:)
     real(f8), allocatable :: rp2(:)
@@ -141,7 +142,7 @@ module gPara
 !> ========== Namelists ==========
 
     namelist /task/ reactChannel, IF_inelastic, IDflux, fluxPos, Atoms, nPES, energyUnit, potentialType, outfile
-    namelist /energy/ E_range, dE
+    namelist /energy/ E_range, dE, CPCut
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR
     namelist /VabsAndDump/ Vabs
@@ -253,6 +254,7 @@ contains
             kReact(iEtot) = dsqrt(2.0_f8*massTot*Etot(iEtot))
         end do
         initWP%Ec = initWP%Ec * energyUnitTrans(energyUnit)
+        CPCut = CPCut * energyUnitTrans(energyUnit)
 
     end subroutine energySet
 !> ------------------------------------------------------------------------------------------------------------------ <!

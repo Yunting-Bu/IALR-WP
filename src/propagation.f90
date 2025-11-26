@@ -1,6 +1,5 @@
 module propMod
-    use machina_basic, only : f8, c8, FFTClass
-    use MKL_DFTI
+    use machina_basic, only : f8, c8
     use gPara
 !    use potentMod
 !    use basisMod
@@ -13,74 +12,111 @@ module propMod
 contains 
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine getKinMat()
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine getZKinMat()
         implicit none
-        real(f8) :: range_Z, range_r 
-        integer :: iZ, ir 
+        real(f8) :: range_Z, fact
+        integer :: i, j 
 
         range_Z = IALR%Z_range(2)-IALR%Z_range(1)
-        range_r = IALR%r_range(2)-IALR%r_range(1)
 
-        allocate(Z_KinMat(IALR%nZ_IALR))
-        allocate(r_KinMat(IALR%nr_int))
+        allocate(Z_KinMat(IALR%nZ_IALR,IALR%nZ_IALR))
 
-        do iZ = 1, IALR%nZ_IALR
-            Z_KinMat(iZ) = (iZ*pi/range_Z)**2/(2.0_f8*massTot)
-        end do
-
-        do ir = 1, IALR%nr_int
-            r_KinMat(ir) = (ir*pi/range_r)**2/(2.0_f8*massBC)
+!> FFT could be better
+        fact = pi*pi/(4.0_f8*massTot*range_Z*range_Z)
+        do i = 1, IALR%nZ_IALR 
+            do j = 1, i-1
+                Z_KinMat(i,j) = fact  * &
+                                ((dsin(pi * (i-j) / (2.0_f8 * (IALR%nZ_IALR+1))))**(-2) - &
+                                (dsin(pi * (i+j) / (2.0_f8 * (IALR%nZ_IALR+1))))**(-2)) * (-1.0_f8) **(i-j)
+            end do
+            Z_KinMat(i,i) = fact * &
+                            ((2.0_f8 * (IALR%nZ_IALR+1)**2 +1.0_f8) / 3.0_f8 - &
+                            (dsin(pi * i / (IALR%nZ_IALR+1)))**(-2))
+        end do 
+        do i = 1, IALR%nZ_IALR
+            do j = i+1, IALR%nZ_IALR
+                Z_KinMat(i,j) = Z_KinMat(j,i)
+            end do
         end do
     
     end subroutine getKinMat
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine getRotMat()
-        implicit none
-        real(f8) :: fact, jeigen
-        integer :: ir, j
-        
-        allocate(rotMat(IALR%nr_int,IALR%jint))
-        do ir = 1, IALR%nr_int 
-            fact = 1.0_f8/(2.0_f8*massTot*r_Int(ir)**2)
-            do j = 1, IALR%jint
-                jeigen = real(j*(j+1),f8)
-                rotMat(ir,j) = fact*jeigen
-            end do 
-        end do 
-
-    end subroutine getRotMat
-!> ------------------------------------------------------------------------------------------------------------------ <!
-
-!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine getCPMat()
         implicit none
-        real(f8) ::  delta 
+        real(f8) ::  delta, term1, term2, term3
         real(f8), allocatable :: fact(:)
-        integer :: iZ, KVeryMax, Kmaxj, K, j 
+        real(f8), allocatable :: CPE(:), CPM(:)
+        real(f8), allocatable :: work(:)
+        integer :: v, qn_j, vp, qn_jp, K, Kp
+        integer :: iZ, ichnl, jchnl, lwork, info
 
-        KVeryMax = min(initWP%Jtot, IALR%jint)
-        allocate(CPDiag(IALR%nZ_IALR, initWP%jmin:IALR%jint,initWP%Kmin:KVeryMax))
-        allocate(CPKMinus(IALR%nZ_IALR, initWP%jmin:IALR%jint,initWP%Kmin:KVeryMax))
-        allocate(CPKPlus(IALR%nZ_IALR, initWP%jmin:IALR%jint,initWP%Kmin:KVeryMax))
+        allocate(CPMat(IALR%nZ_IALR, nChannels, nChannels))
         allocate(fact(IALR%nZ_IALR))
+        allocate(CPE(nChannels), CPM(nChannels,nChannels))
 
         do iZ = 1, IALR%nZ_IALR
             fact(iZ) = 1.0_f8/(2.0_f8*massTot*Z_IALR(iZ)**2)
         end do
 
-        do j = initWP%jmin, IALR%jint, initWP%jinc
-            Kmaxj = min(j, initWP%Jtot, KVeryMax) 
-            do K = initWP%Kmin, Kmaxj 
-                CPDiag(:,j,K) = (initWP%Jtot*(initWP%Jtot+1.0_f8)+j*(j+1.0_f8)-K**2)*fact(:)
+        do ichnl = 1, nChannels
+            v = qn_channel(ichnl,1)
+            qn_j = qn_channel(ichnl,2)
+            K = qn_channel(ichnl,3)
+            do jchnl = 1, ichnl
+                vp = qn_channel(jchnl,1)
+                qn_jp = qn_channel(jchnl,2)
+                Kp = qn_channel(jchnl,3)
+                if (v / = vp .or. qn_j /= qn_jp) cycle
+
+                term1 = merge((initWP%Jtot*(initWP%Jtot+1.0_f8)+qn_j*(qn_j+1.0_f8)-2.0_f8*K*K), &
+                               0.0_f8, K == Kp)
+            
                 delta = merge(dsqrt(2.0_f8), 1.0_f8, K == 0)
-                if ((K+1 > Kmaxj) .or. (K-1 < initWP%Kmin)) cycle
-                CPKPlus(:,j,K+1) = delta*lambdaPlus(j,K)*lambdaPlus(initWP%Jtot,K)*fact(:)
-                CPKMinus(:,j,K-1) = delta*lambdaMinus(j,K)*lambdaMinus(initWP%Jtot,K)*fact(:)
+                term2 = merge(delta*lambdaPlus(initWP%Jtot,K)*lambdaPlus(qn_j,K), &
+                              0.0_f8, Kp == K+1)
+                
+                delta = merge(dsqrt(2.0_f8), 1.0_f8, K == 1)
+                term3 = merge(delta*lambdaMinus(initWP%Jtot,K)*lambdaMinus(qn_j,K), &
+                              0.0_f8, Kp == K-1)
+
+                CPM(ichnl, jchnl) = term1 - term2 - term3
+                CPM(jchnl, ichnl) = CPM(ichnl, jchnl)
+            end do 
+        end do
+                
+
+        allocate(work(1))
+        call dsyev('V', 'U', nChannels, CPM, nChannels, CPE, work, -1, info)
+        lwork = int(work(1))
+        deallocate(work)
+
+        allocate(work(lwork))
+        call dsyev('V', 'U', nChannels, CPM, nChannels, CPE, work, lwork, info)
+        if (info /= 0) then
+            write(outFileUnit,*) "Error in DSYEV of CPE, info =", info
+            write(outFileUnit,*) "POSITION: propagation.f90, subroutine getCPMat()"
+            stop
+        end if
+        deallocate(work)
+
+        do iZ = 1, IALR%nZ_IALR
+            do ichnl = 1, nChannels
+                do jchnl = 1, nChannels
+                    delta = 0.0_f8
+                    do K = 1, nChannels
+                        CPE(K) = min(CPE(K)*fact(iZ), CPCut)
+                        delta = delta + CPM(jchnl,K)*CPE(K)*CPM(ichnl,K)
+                    end do 
+                    CPMat(iZ,jchnl,ichnl) = delta
+                end do 
             end do 
         end do 
-        deallocate(fact)
+
+        deallocate(fact, CPM, CPE)
     end subroutine getCPMat
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
