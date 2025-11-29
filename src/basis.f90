@@ -168,6 +168,8 @@ contains
             normWF = normWF + asyBC_POWF(ir,initWP%v0,initWP%j0)**2
         end do 
 
+        Etot = Ecol + asyBC_Evj(initWP%v0, initWP%j0)
+
         write(outFileUnit,'(1x,a,2i2,a)') 'Initial ro-vibrational energy of (v0, j0) = (', initWP%v0, initWP%j0, ') state.'
         write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2ev, ' eV.'
         write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2cm, ' cm-1.'

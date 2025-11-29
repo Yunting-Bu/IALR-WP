@@ -123,11 +123,11 @@ contains
         wZ = dsqrt(Z_IALR(2)-Z_IALR(1))
 
         do iEtot = 1, nEtot
-            energyAM(iEtot) = imgZore
+            initAM(iEtot) = imgZore
             do iZ = 1, IALR%nZ_IALR
                 call rbesjy(initWP%l0*1.0_f8, kReact(iEtot)*Z_IALR(iZ), rbZ, rbZP, rbZU, rbZUP)
-                energyAM(iEtot) = energyAM(iEtot) + fact/dsqrt(kReact(iEtot)) * &
-                                  phase * (-rbZU+img*rbZ) * wZ * initGaussWP(iZ)
+                initAM(iEtot) = initAM(iEtot) + fact/dsqrt(kReact(iEtot)) * &
+                                phase * (-rbZU+img*rbZ) * wZ * initGaussWP(iZ)
             end do 
         end do
 
@@ -138,7 +138,7 @@ contains
         write(outFileUnit,'(1x,5("-"),3x,20("-"),3x,20("-"),3x,20("-"),3x,20("-"))')
         do iEtot = 1, nEtot
             write(outFileUnit,'(1x,i5,3x,f20.10,3x,f20.10,3x,f20.10,3x,f20.10)') iEtot, Etot(iEtot)*au2ev, kReact(iEtot)*au2ev, &
-                                                             energyAM(iEtot)%re*au2ev, energyAM(iEtot)%im*au2ev
+                                                                                 initAM(iEtot)%re*au2ev, initAM(iEtot)%im*au2ev
         end do 
         write(outFileUnit,*) ''
 

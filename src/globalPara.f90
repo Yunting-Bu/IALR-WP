@@ -41,12 +41,6 @@ module gPara
         real(f8) :: Zasy_range, Zlr_range, rabs_range
     end type Vabs_class
 
-    type :: ine_class
-        integer :: vmax, jmax
-        real(f8) :: project_Zine
-        integer :: T_ine
-    end type ine_class
-
     type :: channel1_class
         integer :: nrp, vpmax, jpmax, jpar, midcoor 
         real(f8) :: rp_range(2), rinf 
@@ -68,10 +62,12 @@ module gPara
     integer :: nEtot, outFileUnit
     real(f8) :: E_range(2), dE, CPCut 
     real(f8), allocatable :: Etot(:)
+    real(f8), allocatable :: Ecol(:)
     real(f8) :: energyUnitTrans(4) = [cm2au, ev2au, K2au, 1.0_f8]
 !> Wave number in reactant coordinate
     real(f8), allocatable :: kReact(:)
-    complex(c8), allocatable :: energyAM(:)
+    complex(c8), allocatable :: initAM(:)
+    real(f8), allocatable :: finalAM(:)
 !> Atoms and masses
     real(f8) :: atomMass(3), massBC, massTot
     character(len=2) :: Atoms(3)
@@ -79,6 +75,7 @@ module gPara
     character(len=4) :: potentialType
     character(len=50) :: outfile
     logical :: IF_inelastic
+    real(f8) :: project_Zine
 !> Flux
     character(len=1) :: IDflux 
     real(f8) :: fluxPos
@@ -128,6 +125,9 @@ module gPara
     real(f8), allocatable :: lrWP(:,:,:,:)
     real(f8), allocatable :: asyWP(:,:,:,:)
     real(f8), allocatable :: intWP(:,:,:,:)
+!> Chebyshev 
+    real(f8), allocatable :: ChebyAngle(:)
+    real(f8) :: Hplus, Hminus
 !> Product channel grids
     real(f8), allocatable :: rp1(:)
     real(f8), allocatable :: rp2(:)
@@ -135,19 +135,17 @@ module gPara
     type(initWP_class) :: initWP
     type(IALR_class) :: IALR 
     type(Vabs_class) :: Vabs 
-    type(ine_class) :: ine 
     type(channel1_class) :: channel1
     type(channel2_class) :: channel2 
 
 !> ========== Namelists ==========
 
-    namelist /task/ reactChannel, IF_inelastic, IDflux, fluxPos, Atoms, nPES, energyUnit, potentialType, outfile
+    namelist /task/ reactChannel, IF_inelastic, project_Zine, IDflux, fluxPos, Atoms, nPES, energyUnit, potentialType, outfile
     namelist /energy/ E_range, dE, CPCut
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR
     namelist /VabsAndDump/ Vabs
     namelist /propagation/ timeTot, timeStep, timePrint
-    namelist /inelastic/ ine
     namelist /productChannel1/ channel1
     namelist /productChannel2/ channel2
 
@@ -242,15 +240,15 @@ contains
 !> ========== Construct collision energy ==========
 
         nEtot = int((E_range(2) - E_range(1))/dE) + 1
-        allocate(Etot(nEtot),kReact(nEtot))
-        allocate(energyAM(nEtot))
+        allocate(Ecol(nEtot),Etot(nEtot)),kReact(nEtot))
+        allocate(initAM(nEtot))
         do iEtot = 1, nEtot 
-            Etot(iEtot) = E_range(1) + (iEtot-1)*dE 
-            if (Etot(iEtot) > E_range(2)) then
-                Etot(iEtot) = E_range(2)
+            Ecol(iEtot) = E_range(1) + (iEtot-1)*dE 
+            if (Ecol(iEtot) > E_range(2)) then
+                Ecol(iEtot) = E_range(2)
             end if 
             !> convert to au
-            Etot(iEtot) = Etot(iEtot) * energyUnitTrans(energyUnit)
+            Ecol(iEtot) = Ecol(iEtot) * energyUnitTrans(energyUnit)
             kReact(iEtot) = dsqrt(2.0_f8*massTot*Etot(iEtot))
         end do
         initWP%Ec = initWP%Ec * energyUnitTrans(energyUnit)
