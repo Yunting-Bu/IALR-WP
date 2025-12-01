@@ -126,9 +126,9 @@ contains
         write(outFileUnit,'(1x,a)') '=====> Vasb information <====='
         write(outFileUnit,'(1x,a)') ''
 !> Vabs in r
-        allocate(Fabs(IALR%nr_int))
+        allocate(Fabs(IALR%vint))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in r:'
-        call getVabs(Vabs%rabs_range,Vabs%Cr,IALR%nr_int,r_Int,timeStep,Vabs%nrabs,Fabs)
+        call getVabs(Vabs%rabs_range,Vabs%Cr,IALR%vint,r_Int,timeStep,Vabs%nrabs,Fabs)
 !> Vabs in long-range
         allocate(Flr(IALR%nZ_IALR))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in Z_lr:'
@@ -172,8 +172,8 @@ contains
             end do
         end do
 
-!> Type = 'INT', for the nr_all * nZ_I range
-!> Type = 'ALR', for the nr_asy * (nZ_asy+nZ_lr) range 
+!> Type = 'INT', for the vint * nZ_I range
+!> Type = 'ALR', for the vasy * (nZ_asy+nZ_lr) range 
         fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'
         call BinReadWrite(fileName, Vadia, 'write')
 
@@ -195,14 +195,14 @@ contains
         
 
 !> Interaction potential in the interaction region
-        allocate(INT_Vadia(nPES,IALR%nZ_I,IALR%nr_int,IALR%jint))
-        allocate(INT_AtD(nPES,nPES,IALR%nZ_I,IALR%nr_int,IALR%jint))
+        allocate(INT_Vadia(nPES,IALR%nZ_I,IALR%vint,IALR%jint))
+        allocate(INT_AtD(nPES,nPES,IALR%nZ_I,IALR%vint,IALR%jint))
         write(outFileUnit,'(1x,a)') '=====> Interaction potential information <====='
         write(outFileUnit,'(1x,a)') ''
         type = 'INT'
         if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the interaction region...'
-            call interactionPot(IALR%nZ_I, IALR%nr_int, IALR%jint, Z_I, r_Int, intANode, type, INT_Vadia, INT_AtD)
+            call interactionPot(IALR%nZ_I, IALR%vint, IALR%jint, Z_I, r_Int, intANode, type, INT_Vadia, INT_AtD)
         else if (trim(potentialType) == 'Read') then 
 
             fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'
@@ -223,12 +223,12 @@ contains
         allocate(Z_ALR(nZ_ALR))
         Z_ALR(1:IALR%nZ_IA) = Z_IALR(IALR%nZ_I+1:IALR%nZ_IALR)
 
-        allocate(ALR_Vadia(nPES,nZ_ALR,IALR%nr_PODVR,IALR%jasy))
-        allocate(ALR_AtD(nPES,nPES,nZ_ALR,IALR%nr_PODVR,IALR%jasy))
+        allocate(ALR_Vadia(nPES,nZ_ALR,IALR%vasy,IALR%jasy))
+        allocate(ALR_AtD(nPES,nPES,nZ_ALR,IALR%vasy,IALR%jasy))
         type = 'ALR'
         if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the asymptotic and long-range region...'
-            call interactionPot(nZ_ALR, IALR%nr_PODVR, IALR%jasy, Z_ALR, r_PODVR, asyANode, type, ALR_Vadia, ALR_AtD)
+            call interactionPot(nZ_ALR, IALR%vasy, IALR%jasy, Z_ALR, r_Asy, asyANode, type, ALR_Vadia, ALR_AtD)
         else if (trim(potentialType) == 'Read') then 
 
             fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'

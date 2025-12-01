@@ -54,7 +54,7 @@ contains
 !>      |----|----|----|
 !> r1   |----|----|----|
 !>      Z1   Z2   Z3   Z4
-!>  nDVR in range [r1, r3] = vint, nDVR in range [r1, r2] = nr_asy 
+!>  nDVR in range [r1, r3] = vint, nPODVR in range [r1, r2] = vasy 
 !>  VAbs: Z3 = Zabs_asy_end, Z4 = Zabs_lr_end
 
 !> Allocate IALR DVR grids, kinetic energy and transMatrix
@@ -64,9 +64,9 @@ contains
         allocate(BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
         allocate(BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
         allocate(BZ_I(IALR%nZ_I, IALR%nZ_I))
-        allocate(r_Asy(IALR%nr_asy), r_Int(IALR%nr_int))
-        allocate(B_rInt(IALR%nr_int, IALR%nr_int))
-        allocate(B_rAsy(IALR%nr_asy, IALR%nr_asy))
+        allocate(r_Asy(IALR%vasy), r_Int(IALR%vint))
+        allocate(B_rInt(IALR%vint, IALR%vint))
+!        allocate(B_rAsy(IALR%nr_asy, IALR%nr_asy))
 
 !> ======== DVR calculate =========
         range_IALR = IALR%Z_range(2) - IALR%Z_range(1)
@@ -83,13 +83,13 @@ contains
         Z_I(1:IALR%nZ_I) = Z_IALR(1:IALR%nZ_I) 
 
         range_r = IALR%r_range(2) - IALR%r_range(1)
-        dR = range_r / real(IALR%nr_int + 1, f8)
-        call DVR_Grid(IALR%nr_int, IALR%r_range(1), IALR%r_range(2), r_Int)
-        call DVR_TransMat(range_r, IALR%nr_int, B_rInt)
+        dR = range_r / real(IALR%vint + 1, f8)
+        call DVR_Grid(IALR%vint, IALR%r_range(1), IALR%r_range(2), r_Int)
+        call DVR_TransMat(range_r, IALR%vint, B_rInt)
 
-        range_rA = dR * (IALR%nr_asy + 1)
-        call DVR_TransMat(range_rA, IALR%nr_asy, B_rAsy)
-        r_Asy(:) = r_Int(1:IALR%nr_asy)
+!        range_rA = dR * (IALR%nr_asy + 1)
+!        call DVR_TransMat(range_rA, IALR%nr_asy, B_rAsy)
+!        r_Asy(:) = r_Int(1:IALR%nr_asy)
 
 !> Interaction theta basis
         call int_thetaWF()
@@ -126,40 +126,45 @@ contains
 !> Channel set as (v,j,K)
         call setChannel()
 !> Allocate wave function
-        allocate(asyAdiaWFvjK(nChannels,IALR%nr_PODVR))
+        allocate(asyAdiaWFvjK(nChannels,IALR%vasy))
 !        allocate(asyDiaWFvjK(nChannels,IALR%nr_PODVR))
 !        allocate(tmp(IALR%nr_PODVR, IALR%vasy))
         call getANodeAndWeight(initWP%jpar, IALR%jasy, asyANode, asyAWeight)
 
 !> Allocate PODVR array
-        allocate(adiaV(nPES,IALR%nr_asy))
-        allocate(DVREig(IALR%nr_asy), DVRWF(IALR%nr_asy,IALR%nr_asy))
-        allocate(asyBC_AtDMat(nPES,IALR%nr_asy))
+        allocate(adiaV(nPES,IALR%vint))
+        allocate(DVREig(IALR%vint), DVRWF(IALR%vint,IALR%vint))
+        allocate(asyBC_AtDMat(nPES,IALR%vint))
         allocate(asyBC_Evj(0:IALR%vasy,0:IALR%jasy))
-        allocate(r_PODVR(IALR%nr_PODVR))
-        allocate(asyPO2FBR(IALR%nr_PODVR,IALR%nr_PODVR))
-!        allocate(asyDVRWF(IALR%nr_asy, 0:IALR%nr_PODVR-1,0:IALR%jasy))
-        allocate(asyBC_POWF(IALR%nr_PODVR,0:IALR%vasy,0:IALR%jasy))
-!        allocate(asyDiaPOWF(IALR%nr_PODVR,0:IALR%nr_PODVR-1,0:IALR%jasy))
+        allocate(asyPO2FBR(IALR%vasy,IALR%vasy))
+        allocate(asyBC_POWF(IALR%vasy,0:IALR%vasy,0:IALR%jasy))
 
 !> In this situation, bond(2) is the length of BC
 !> You should check the PES interface!
         bond(1) = longDistance
         bond(3) = longDistance
-        do ir = 1, IALR%nr_asy
-            bond(2) = r_Asy(ir)
+        do ir = 1, IALR%vint
+            bond(2) = r_Int(ir)
             call diagDiaVmat(bond,AtDMat,Vadia)
             asyBC_AtDMat(:,ir) = AtDMat(:,initWP%initPES)
             adiaV(:,ir) = Vadia(:)
         end do 
-        dr = (IALR%r_range(2) - IALR%r_range(1)) / real(IALR%nr_int + 1, f8)
-        range_rA = dr * (IALR%nr_asy + 1)
-        call DVR_calc(IALR%nr_asy,massBC,range_rA,adiaV,DVREig,DVRWF)
-        call PODVR(IALR%nr_PODVR,IALR%nr_asy,DVRWF,r_Asy,DVREig,IALR%vasy,IALR%jasy,massBC,r_PODVR,asyPO2DVR)
+!        dr = (IALR%r_range(2) - IALR%r_range(1)) / real(IALR%vint + 1, f8)
+!        range_rA = dr * (IALR%nr_asy + 1)
+        range_rA = IALR%r_range(2) - IALR%r_range(1)
+        call DVR_calc(IALR%vint,massBC,range_rA,adiaV,DVREig,DVRWF)
+        call PODVR(IALR%vasy,IALR%vint,DVRWF,r_Int,DVREig,massBC,r_Asy)
+
+        allocate(adiaVBC(nPES,IALR%vasy))
+        do ir = 1, IALR%vasy 
+            bond(2) = r_Asy(ir)
+            call diagDiaVmat(bond,AtDMat,Vadia)
+            adiaVBC(:,ir) = Vadia(:)
+        end do
 
         write(outFileUnit,'(1x,a)') '=====> Initail ro-vibrational state information <====='
         write(outFileUnit,'(1x,a)') ''
-        write(outFileUnit,'(1x,a,f15.9,a,f15.9,a)') 'PODVR grids range: [', r_PODVR(1), ', ', r_PODVR(IALR%nr_PODVR), '  ] a.u.'
+        write(outFileUnit,'(1x,a,f15.9,a,f15.9,a)') 'PODVR grids range: [', r_Asy(1), ', ', r_Asy(IALR%vasy), '  ] a.u.'
         write(outFileUnit,'(1x,a)') "Please ensure that the PODVR grid covers the relevant region of the BC potential!"
         write(outFileUnit,*) ''
 
@@ -177,15 +182,6 @@ contains
         write(outFileUnit,*) ''
         write(outFileUnit,'(1x,a,f15.9)') 'Initial ro-vibrational wave function normalization check: ', normWF
         write(outFileUnit,'(1x,a)') ''
-
-        !block 
-        !    real(f8) :: tmpDVRWF(IALR%vasy), tmpPOWF(IALR%nr_PODVR)
-        !    integer :: iv, ij 
-
-!            do iv = 0, IALR%nr_PODVR-1
-!                do ij = 0, IALR%jasy 
-!                    tmpPOWF(:) = asyBC_POWF(:,iv,ij)
-!                    tmpDVRWF = matmul(asyPO2DVR, tmpPOWF)
 
         asyAdiaWFvjK = 0.0_f8
         do i = 1, nChannels
@@ -209,14 +205,14 @@ contains
 !> The long range WF is based on asyWF
         call asyBC_vibRotThetaWF()
         
-        allocate(lrBC_POWF(IALR%nr_PODVR))
+        allocate(lrBC_POWF(IALR%vasy))
 
         lrBC_Evj = asyBC_Evj(initWP%v0,initWP%j0)
         lrBC_POWF(:) = asyBC_POWF(:,initWP%v0,initWP%j0)
 
         Kmax = min(initWP%Jtot,initWP%j0)
         nchnl = Kmax - initWP%Kmin + 1
-        allocate(lrWFvjK(nchnl,IALR%nr_PODVR))
+        allocate(lrWFvjK(nchnl,IALR%vasy))
         do K = initWP%Kmin, Kmax 
             ichnl = seq_channel(initWP%v0,initWP%j0,K)
             lrWFvjK(ichnl,:) = asyAdiaWFvjK(ichnl,:)
@@ -357,7 +353,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, vmax, jmax, mass, POGrid)
+    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, mass, POGrid)
 !> Calculate the PODVR basis and eigenvalues/eigenfunctions for given DVR basis
 !> See Chemical Physics Letters 1992, 190 (3–4), 225–230.
         implicit none
@@ -365,7 +361,6 @@ contains
         real(f8), intent(in) :: DVRCoeff(:,:)
         real(f8), intent(in) :: DVRGrid(:)
         real(f8), intent(in) :: DVREig(:)
-        integer, intent(in) :: vmax, jmax
         real(f8), intent(in) :: mass
         real(f8), intent(inout) :: POGrid(:)
         real(f8) :: POEig(nPODVR)
@@ -435,7 +430,7 @@ contains
                 end do
             end do
 
-            do qn_j = 0, jmax 
+            do qn_j = 0, IALR%jasy
                 EMat = HRefMat
                 do i = 1, nPODVR
                     EMat(i,i) = EMat(i,i) + real(qn_j*(qn_j+1),f8)/(2.0_f8*mass*POGrid(i)**2)
@@ -461,11 +456,11 @@ contains
                     call phaseTrans(nPODVR, EMat(:,i))
                 end do 
 
-                do qn_v = 0, vmax 
+                do qn_v = 0, IALR%vasy
                     asyBC_Evj(qn_v,qn_j) = POEig(qn_v+1)
                 end do
                 do i = 1, nPODVR
-                    do qn_v = 0, vmax 
+                    do qn_v = 0, IALR%vasy
                         asyBC_POWF(i,qn_v,qn_j) = EMat(i,qn_v+1)
                     end do
                 end do

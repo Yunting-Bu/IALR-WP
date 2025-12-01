@@ -7,15 +7,46 @@ module propMod
     implicit none
 
     public
-    private :: lambdaMinus, lambdaPlus
+    private :: getCPMat, getRotMat, getZKinMat, lambdaMinus, lambdaPlus
 
 contains 
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine HamScale()
         implicit none
-        real(f8) :: TZmax, TZmin, Trmax, TRmin 
-        real(f8) :: Vmax, Vmin, Umax, Umin 
+        real(f8) :: TZmax, TZmin, Trmax, Trmin 
+        real(f8) :: Vmax, Vmin, Umax, Umin, Rotmax, Rotmin 
+        real(f8) :: Hmax, Hmin
+
+        call getZKinMat()
+        call getCPMat()
+        call getRotMat()
+
+        TZmin = 0.0_f8
+        Trmin = 0.0_f8
+        Rotmin = 0.0_f8
+        Umin = minval(CPMat)
+        Vmin = min(minval(INT_Vadia), minval(ALR_Vadia))
+        Hmin = TZmin+Trmin+Rotmin+Umin+Vmin
+
+        TZmax = (pi/(IALR%Z_range(2)-IALR%Z_range(1)))**2/(2.0_f8*massTot)
+        Trmax = (pi/(IALR%r_range(2)-IALR%r_range(1)))**2/(2.0_f8*massBC)
+        Rotmax = maxval(rotMat)
+        Umax = maxval(CPMat)
+        Vmax = max(maxval(INT_Vadia), maxval(ALR_Vadia))
+        Hmax = TZmax+Trmax+Rotmax+Umax+Vmax
+
+        Hplus = (Hmax+Hmin)/2.0_f8
+        Hminus = (Hmax-Hmin)/2.0_f8
+
+        Z_KinMat(:,:) = (Z_KinMat(:,:)-Hplus)/Hminus
+        CPMat(:,:,:) = (CPMat(:,:,:)-Hplus)/Hminus
+        rotMat(:,:) = (rotMat(:,:)-Hplus)/Hminus
+        asyBC_Evj(:,:) = (asyBC_Evj(:,:)-Hplus)/Hminus
+        adiaVBC(:,:) = (adiaVBC(:,:)-Hplus)/Hminus
+        INT_Vadia(:,:,:,:) = (INT_Vadia(:,:,:,:)-Hplus)/Hminus
+        ALR_Vadia(:,:,:,:) = (ALR_Vadia(:,:,:,:)-Hplus)/Hminus
+
 
     end subroutine HamScale
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -57,12 +88,12 @@ contains
         real(f8) :: fact, jeigen
         integer :: ir, j
         
-        allocate(rotMat(IALR%nr_int,IALR%jint))
-        do ir = 1, IALR%nr_int 
+        allocate(rotMat(IALR%vint,IALR%jint))
+        do ir = 1, IALR%vint 
             fact = 1.0_f8/(2.0_f8*massTot*r_Int(ir)**2)
             do j = 1, IALR%jint
                 jeigen = real(j*(j+1),f8)
-                rotMat(ir,j) = fact*jeigen
+                rotMat(ir,j) = min(fact*jeigen, TMaxCut)
             end do 
         end do 
 
@@ -133,7 +164,7 @@ contains
                 do jchnl = 1, nChannels
                     delta = 0.0_f8
                     do K = 1, nChannels
-                        CPE(K) = min(CPE(K)*fact(iZ), CPCut)
+                        CPE(K) = min(CPE(K)*fact(iZ), TMaxCut)
                         delta = delta + CPM(jchnl,K)*CPE(K)*CPM(ichnl,K)
                     end do 
                     CPMat(iZ,jchnl,ichnl) = delta

@@ -1,4 +1,4 @@
-program IALR_WP_SO
+program IALR_WP_CRWP
     use machina_basic, only : f8 
     use gPara
     use potentMod
@@ -14,8 +14,5 @@ program IALR_WP_SO
     call initAllVabs()
     call getIntPot()
     call getEnergyAM()
-    call getKinMat()
-    call getRotMat()
-    call getCPMat()
-    
+    call HamScale() 
 end program IALR_WP_SO

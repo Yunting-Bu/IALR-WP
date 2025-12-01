@@ -30,7 +30,6 @@ module gPara
 
     type :: IALR_class
        integer :: nZ_IALR, nZ_IA, nZ_I
-       integer :: nr_asy, nr_PODVR, nr_int
        integer :: vint, jint, vasy, jasy 
        real(f8) :: Z_range(2), r_range(2)
     end type IALR_class
@@ -60,7 +59,7 @@ module gPara
     integer :: timeTot, timeStep, timePrint
 !> Energy input
     integer :: nEtot, outFileUnit
-    real(f8) :: E_range(2), dE, CPCut 
+    real(f8) :: E_range(2), dE, TMaxCut, VMaxCut 
     real(f8), allocatable :: Etot(:)
     real(f8), allocatable :: Ecol(:)
     real(f8) :: energyUnitTrans(4) = [cm2au, ev2au, K2au, 1.0_f8]
@@ -120,7 +119,7 @@ module gPara
 !    real(f8), allocatable :: Z_KinMat(:), r_KinMat(:)
     real(f8), allocatable :: rotMat(:,:)
     real(f8), allocatable :: CPMat(:,:,:)
-    real(f8), allocatable :: Vmat(:,:,:) 
+    real(f8), allocatable :: adiaVBC(:,:)
 !> Wave packet during propagation
     real(f8), allocatable :: lrWP(:,:,:,:)
     real(f8), allocatable :: asyWP(:,:,:,:)
@@ -140,8 +139,9 @@ module gPara
 
 !> ========== Namelists ==========
 
-    namelist /task/ reactChannel, IF_inelastic, project_Zine, IDflux, fluxPos, Atoms, nPES, energyUnit, potentialType, outfile
-    namelist /energy/ E_range, dE, CPCut
+    namelist /task/ reactChannel, IF_inelastic, project_Zine, IDflux, fluxPos, &
+                    Atoms, nPES, energyUnit, potentialType, outfile
+    namelist /energy/ E_range, dE, TMaxCutCut, VMaxCut
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR
     namelist /VabsAndDump/ Vabs
@@ -252,7 +252,8 @@ contains
             kReact(iEtot) = dsqrt(2.0_f8*massTot*Etot(iEtot))
         end do
         initWP%Ec = initWP%Ec * energyUnitTrans(energyUnit)
-        CPCut = CPCut * energyUnitTrans(energyUnit)
+        TMaxCutCut = TMaxCutCut * energyUnitTrans(energyUnit)
+        VMaxCut = VMaxCut * energyUnitTrans(energyUnit)
 
     end subroutine energySet
 !> ------------------------------------------------------------------------------------------------------------------ <!

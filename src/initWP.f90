@@ -62,12 +62,12 @@ contains
         Kmax = min(initWP%j0, initWP%Jtot)
         nchnl = Kmax - initWP%Kmin + 1
         allocate(initWP_BLK(0:0,initWP%Kmin:Kmax))
-        allocate(initAdiaTotWP(nPES,IALR%nZ_IALR,IALR%nr_PODVR,nchnl))
+        allocate(initAdiaTotWP(nPES,IALR%nZ_IALR,IALR%vasy,nchnl))
 
         call SF2BFMat(initWP%l0,initWP%l0,initWP%Kmin,Kmax,initWP%j0,initWP%Jtot)
 !> Construct initial WP in adiabatic representation
         do iZ = 1, IALR%nZ_IALR
-            do ir = 1, IALR%nr_PODVR
+            do ir = 1, IALR%vasy
                 do K = initWP%Kmin, Kmax 
                     ichnl = seq_channel(initWP%v0,initWP%j0,K)
                     initAdiaTotWP(:,iZ,ir,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir)*initWP_BLK(initWP%l0,K)
@@ -96,11 +96,11 @@ contains
 
         Kmax = min(initWP%j0, initWP%Jtot)
         nchnl = Kmax - initWP%Kmin + 1
-        allocate(initDiaTotWP(nPES,IALR%nZ_IALR,IALR%nr_PODVR,IALR%jasy,nchnl))
+        allocate(initDiaTotWP(nPES,IALR%nZ_IALR,IALR%vasy,IALR%jasy,nchnl))
 
         do iPES = 1, nPES
             do iZ = 1, IALR%nZ_IALR
-                do ir = 1, IALR%nr_PODVR
+                do ir = 1, IALR%vasy
                         initDiaTotWP(iPES,iZ,ir,:) = initAdiaTotWP(iPES,iZ,ir,:) * asyBC_AtDMat(iPES,ir)
                 end do 
             end do 
@@ -120,14 +120,14 @@ contains
 
         fact = dsqrt(massTot/(2.0_f8*pi))
         phase = exp(-img*pi*0.5_f8*initWP%l0)
-        wZ = dsqrt(Z_IALR(2)-Z_IALR(1))
+!        wZ = dsqrt(Z_IALR(2)-Z_IALR(1))
 
         do iEtot = 1, nEtot
             initAM(iEtot) = imgZore
             do iZ = 1, IALR%nZ_IALR
                 call rbesjy(initWP%l0*1.0_f8, kReact(iEtot)*Z_IALR(iZ), rbZ, rbZP, rbZU, rbZUP)
                 initAM(iEtot) = initAM(iEtot) + fact/dsqrt(kReact(iEtot)) * &
-                                phase * (-rbZU+img*rbZ) * wZ * initGaussWP(iZ)
+                                phase * (-rbZU+img*rbZ) * initGaussWP(iZ)
             end do 
         end do
 
