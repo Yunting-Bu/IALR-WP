@@ -29,7 +29,7 @@ module gPara
     end type initWP_class
 
     type :: IALR_class
-       integer :: nZ_IALR, nZ_IA, nZ_I
+       integer :: nZ_IALR, nZ_IA, nZ_I, nPODVR
        integer :: vint, jint, vasy, jasy 
        real(f8) :: Z_range(2), r_range(2)
     end type IALR_class
@@ -66,7 +66,7 @@ module gPara
 !> Wave number in reactant coordinate
     real(f8), allocatable :: kReact(:)
     complex(c8), allocatable :: initAM(:)
-    real(f8), allocatable :: finalAM(:)
+    complex(f8), allocatable :: finalAM(:)
 !> Atoms and masses
     real(f8) :: atomMass(3), massBC, massTot
     character(len=2) :: Atoms(3)
@@ -78,47 +78,40 @@ module gPara
 !> Flux
     character(len=1) :: IDflux 
     real(f8) :: fluxPos
-!> Channels
+!> Channels (v,j,K,iPES)
     integer :: nChannels
     integer, allocatable :: qn_channel(:,:)
-    integer, allocatable :: seq_channel(:,:,:)
+    integer, allocatable :: seq_channel(:,:,:,:)
 !> I - interaction region
 !> A - asymptotic region
 !> LR - long range region
 !> B for DVR-FBR transformation matrix
     real(f8), allocatable :: Z_IALR(:), Z_IA(:), Z_I(:), r_Int(:), r_Asy(:)
     real(f8), allocatable :: BZ_IALR(:,:), BZ_IA(:,:), BZ_I(:,:), B_rInt(:,:), B_rAsy(:,:)
-    real(f8), allocatable :: r_PODVR(:), asyPO2FBR(:,:)
+    real(f8), allocatable :: asyPO2FBR(:,:)
 !> Grids and weights for K independent Gauss-Legendre quadrature
     real(f8), allocatable :: asyANode(:), asyAWeight(:)
 !> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in asymptotic range
-    real(f8), allocatable :: asyAdiaWFvjK(:,:)
-    real(f8), allocatable :: asyDiaWFvjK(:,:)
-    real(f8), allocatable :: asyBC_Evj(:,:)
-    real(f8), allocatable :: asyBC_POWF(:,:,:)
-!> Vib-rotational basis and K-independent Guass-Legrendre basis of BC in long-range
-!> Only have one state (v0, j0)
-    real(f8) :: lrBC_Evj
-    real(f8), allocatable :: lrWFvjK(:,:)
-    real(f8), allocatable :: lrBC_POWF(:)
-    real(f8), allocatable :: asyBC_AtDMat(:,:)
+    real(f8), allocatable :: asyBC_Evj(:,:,:)
+    real(f8), allocatable :: asyBC_POWF(:,:,:,:)
+    real(f8), allocatable :: asyBC_DVRWF(:,:,:,:)
 !> FBR in theta, Z_int
     real(f8), allocatable :: intANode(:), intAWeight(:)
 !> Initial Gaussian-shape WP and initial total WP
     real(f8), allocatable :: initGaussWP(:)
-    real(f8), allocatable :: initAdiaTotWP(:,:,:,:)
-    real(f8), allocatable :: initDiaTotWP(:,:,:,:)
+    real(f8), allocatable :: initTotWP(:,:)
     real(f8), allocatable :: initWP_BLK(:,:)
 !> Vabs
     real(f8), allocatable :: Fasy(:), Flr(:), Fabs(:) 
 !> Interaction potential matrix and diabatic-to-adiabatic transformation matrix
     real(f8), allocatable :: INT_Vadia(:,:,:,:), INT_AtD(:,:,:,:,:)
-    real(f8), allocatable :: ALR_Vadia(:,:,:,:), ALR_AtD(:,:,:,:,:)
+    real(f8), allocatable :: ALR_Vdiag(:,:,:,:), ALR_Voff(:,:,:,:,:)
 !> Hamiltonian matrix
     real(f8), allocatable :: Z_KinMat(:,:), r_KinMat(:,:)
-!    real(f8), allocatable :: Z_KinMat(:), r_KinMat(:)
     real(f8), allocatable :: rotMat(:,:)
     real(f8), allocatable :: CPMat(:,:,:)
+    real(f8), allocatable :: VintMat(:,:,:)
+    real(f8), allocatable :: VeffMat(:,:,:) !> CP + Vint
     real(f8), allocatable :: adiaVBC(:,:)
 !> Wave packet during propagation
     real(f8), allocatable :: lrWP(:,:,:,:)
@@ -141,7 +134,7 @@ module gPara
 
     namelist /task/ reactChannel, IF_inelastic, project_Zine, IDflux, fluxPos, &
                     Atoms, nPES, energyUnit, potentialType, outfile
-    namelist /energy/ E_range, dE, TMaxCutCut, VMaxCut
+    namelist /energy/ E_range, dE, TMaxCut, VMaxCut
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR
     namelist /VabsAndDump/ Vabs
@@ -172,7 +165,6 @@ contains
 
         if (reactChannel == 2) read(inpFileUnit, nml=productChannel2)
         rewind(inpFileUnit)
-        if (IF_inelastic) read(inpFileUnit, nml=inelastic) 
 
         close(inpFileUnit)
         
@@ -217,7 +209,7 @@ contains
 
 !> ========== Output ==========
 
-        write(outFileUnit,'(1x,a)') " =====> Input parameters ======<"
+        write(outFileUnit,'(1x,a)') " =====> Input parameters <======"
         write(outFileUnit,'(1x,a)') ''
         write(outFileUnit,'(1x,a,a,a)') "Reaction Channel: ", &
             merge("A + BC -> AB + C           ", "A + BC -> AB + C and AC + B", reactChannel==1)
@@ -240,7 +232,7 @@ contains
 !> ========== Construct collision energy ==========
 
         nEtot = int((E_range(2) - E_range(1))/dE) + 1
-        allocate(Ecol(nEtot),Etot(nEtot)),kReact(nEtot))
+        allocate(Ecol(nEtot),Etot(nEtot),kReact(nEtot))
         allocate(initAM(nEtot))
         do iEtot = 1, nEtot 
             Ecol(iEtot) = E_range(1) + (iEtot-1)*dE 
@@ -249,10 +241,10 @@ contains
             end if 
             !> convert to au
             Ecol(iEtot) = Ecol(iEtot) * energyUnitTrans(energyUnit)
-            kReact(iEtot) = dsqrt(2.0_f8*massTot*Etot(iEtot))
+            kReact(iEtot) = dsqrt(2.0_f8*massTot*Ecol(iEtot))
         end do
         initWP%Ec = initWP%Ec * energyUnitTrans(energyUnit)
-        TMaxCutCut = TMaxCutCut * energyUnitTrans(energyUnit)
+        TMaxCut = TMaxCut * energyUnitTrans(energyUnit)
         VMaxCut = VMaxCut * energyUnitTrans(energyUnit)
 
     end subroutine energySet

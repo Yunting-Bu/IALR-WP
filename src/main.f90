@@ -10,9 +10,9 @@ program IALR_WP_CRWP
 !> Test
     call initPara()
     call DVR_IALR()
-    call getAdiaInitTotWP()
+    call getInitTotWP()
     call initAllVabs()
     call getIntPot()
     call getEnergyAM()
     call HamScale() 
-end program IALR_WP_SO
+end program IALR_WP_CRWP

@@ -48,64 +48,42 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine getAdiaInitTotWP()
+    subroutine getInitTotWP()
         implicit none
         real(f8) :: normWPTot, normWPZ
         integer :: ir, iZ, iPES, ith 
-        integer :: Kmax, K, ichnl, nchnl
+        integer :: Kmax, K, ichnl
 
 !> WF at Z in DVR
         call Z_initGaussWP()
-!> WF at r in PODVR and theta in FBR
-        call lrBC_vibRotThetaWF()
+!> WF at r in FBR and theta in FBR
+        call asyBC_vibRotThetaWF()
 
+!> Only save (v0, j0, initPES, K), Kmin <= K <= Kmax
         Kmax = min(initWP%j0, initWP%Jtot)
-        nchnl = Kmax - initWP%Kmin + 1
         allocate(initWP_BLK(0:0,initWP%Kmin:Kmax))
-        allocate(initAdiaTotWP(nPES,IALR%nZ_IALR,IALR%vasy,nchnl))
+        allocate(initTotWP(IALR%nZ_IALR,nChannels))
 
         call SF2BFMat(initWP%l0,initWP%l0,initWP%Kmin,Kmax,initWP%j0,initWP%Jtot)
 !> Construct initial WP in adiabatic representation
+        initTotWP(:,:) = 0.0_f8
         do iZ = 1, IALR%nZ_IALR
-            do ir = 1, IALR%vasy
-                do K = initWP%Kmin, Kmax 
-                    ichnl = seq_channel(initWP%v0,initWP%j0,K)
-                    initAdiaTotWP(:,iZ,ir,ichnl) = initGaussWP(iZ)*lrWFvjK(ichnl,ir)*initWP_BLK(initWP%l0,K)
-                end do 
+            do K = initWP%Kmin, Kmax 
+                ichnl = seq_channel(initWP%v0,initWP%j0,K,initWP%initPES)
+                initTotWP(iZ,ichnl) = initGaussWP(iZ)*initWP_BLK(initWP%l0,K)
             end do 
         end do
 
         write(outFileUnit,'(1x,a)') "=====> Initial WP infromation <====="
         write(outFileUnit,'(1x,a)') ''
         write(outFileUnit,'(1x,a,f15.9,a,f15.9,a,f15.9)') 'Z0 = ', initWP%Zc, ' , E0 = ', initWP%Ec, ' , delta = ', initWP%delta
-        normWPTot = sum( abs(initAdiaTotWP)**2 )
+        normWPTot = sum( abs(initTotWP)**2 )
         normWPZ = sum( abs(initGaussWP)**2 )
         write(outFileUnit,'(1x,a,f15.9)') 'Initial Gaussian wave-packet normalization check: ', normWPZ
         write(outFileUnit,'(1x,a,f15.9)') 'Initial adiabatic total wave-packet normalization check: ', normWPTot
         write(outFileUnit,'(1x,a)') ''
 
-    end subroutine getAdiaInitTotWP
-!> ------------------------------------------------------------------------------------------------------------------ <!
-
-!> ------------------------------------------------------------------------------------------------------------------ <!
-!> Has some problems
-    subroutine getDiaInitTotWP()
-        implicit none
-        integer :: iPES, iZ, ir, ith 
-        integer :: Kmax, K, nchnl
-
-        Kmax = min(initWP%j0, initWP%Jtot)
-        nchnl = Kmax - initWP%Kmin + 1
-        allocate(initDiaTotWP(nPES,IALR%nZ_IALR,IALR%vasy,IALR%jasy,nchnl))
-
-        do iPES = 1, nPES
-            do iZ = 1, IALR%nZ_IALR
-                do ir = 1, IALR%vasy
-                        initDiaTotWP(iPES,iZ,ir,:) = initAdiaTotWP(iPES,iZ,ir,:) * asyBC_AtDMat(iPES,ir)
-                end do 
-            end do 
-        end do
-    end subroutine getDiaInitTotWP
+    end subroutine getInitTotWP
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -120,14 +98,14 @@ contains
 
         fact = dsqrt(massTot/(2.0_f8*pi))
         phase = exp(-img*pi*0.5_f8*initWP%l0)
-!        wZ = dsqrt(Z_IALR(2)-Z_IALR(1))
+        wZ = dsqrt(Z_IALR(2)-Z_IALR(1))
 
         do iEtot = 1, nEtot
             initAM(iEtot) = imgZore
             do iZ = 1, IALR%nZ_IALR
                 call rbesjy(initWP%l0*1.0_f8, kReact(iEtot)*Z_IALR(iZ), rbZ, rbZP, rbZU, rbZUP)
                 initAM(iEtot) = initAM(iEtot) + fact/dsqrt(kReact(iEtot)) * &
-                                phase * (-rbZU+img*rbZ) * initGaussWP(iZ)
+                                -img * cmplx(rbZU, -rbZ, kind=c8) * initGaussWP(iZ) * wZ
             end do 
         end do
 
@@ -137,7 +115,7 @@ contains
         write(outFileUnit,'(1x,a5,3x,a20,3x,a20,3x,a20,3x,a20)') 'nEtot','Etot', 'Wave Number', 'Amplitude (real)', 'Amplitude (img)'
         write(outFileUnit,'(1x,5("-"),3x,20("-"),3x,20("-"),3x,20("-"),3x,20("-"))')
         do iEtot = 1, nEtot
-            write(outFileUnit,'(1x,i5,3x,f20.10,3x,f20.10,3x,f20.10,3x,f20.10)') iEtot, Etot(iEtot)*au2ev, kReact(iEtot)*au2ev, &
+            write(outFileUnit,'(1x,i5,3x,f20.10,3x,f20.10,3x,f20.10,3x,f20.10)') iEtot, Ecol(iEtot)*au2ev, kReact(iEtot)*au2ev, &
                                                                                  initAM(iEtot)%re*au2ev, initAM(iEtot)%im*au2ev
         end do 
         write(outFileUnit,*) ''
@@ -151,12 +129,10 @@ contains
         real(f8), intent(in) :: E0, delta, Z0, mass, Z
         real(f8) :: fact, expPart, cosPart 
 
-!> Since we use SO method
-!> The WP isn't real packet
-        fact = (2.0_f8/(pi*delta*delta))**(0.25)
+        fact = (1.0_f8/(pi*delta*delta))**(0.25)
         expPart = -(Z-Z0)**2 / delta**2
         cosPart = Z * dsqrt(2.0_f8*E0*mass)
-        WP = fact * exp(expPart)*cos(cosPart)
+        WP = fact * exp(expPart/2.0_f8)*cos(cosPart)
 
         return
     end function GaussianWavePacket

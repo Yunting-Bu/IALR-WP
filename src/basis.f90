@@ -5,7 +5,7 @@ module basisMod
     implicit none
     public
 
-    private :: setChannel, asyBC_vibRotThetaWF, int_thetaWF
+    private :: setChannel, int_thetaWF
    
 contains
 
@@ -58,13 +58,14 @@ contains
 !>  VAbs: Z3 = Zabs_asy_end, Z4 = Zabs_lr_end
 
 !> Allocate IALR DVR grids, kinetic energy and transMatrix
+        IALR%nPODVR = IALR%vasy + 1
         allocate(Z_IALR(IALR%nZ_IALR))
         allocate(Z_IA(IALR%nZ_IA))
         allocate(Z_I(IALR%nZ_I))
         allocate(BZ_IALR(IALR%nZ_IALR, IALR%nZ_IALR))
         allocate(BZ_IA(IALR%nZ_IA, IALR%nZ_IA))
         allocate(BZ_I(IALR%nZ_I, IALR%nZ_I))
-        allocate(r_Asy(IALR%vasy), r_Int(IALR%vint))
+        allocate(r_Asy(IALR%nPODVR), r_Int(IALR%vint))
         allocate(B_rInt(IALR%vint, IALR%vint))
 !        allocate(B_rAsy(IALR%nr_asy, IALR%nr_asy))
 
@@ -114,30 +115,27 @@ contains
         real(f8), parameter :: longDistance = 30.0_f8
         real(f8) :: bond(3), AtDMat(nPES,nPES), Vadia(nPES)
         real(f8), allocatable :: adiaV(:,:)
-        real(f8), allocatable :: DVREig(:)
-        real(f8), allocatable :: DVRWF(:,:), asyDiaPOWF(:,:,:), asyDVRWF(:,:,:)
-        real(f8) :: normWF, dr, range_rA
-        integer :: ir, v, j, K, i
+        real(f8), allocatable :: DVREig(:), DVRWF(:,:)
+        real(f8) :: normWF, dr, range_r
+        integer :: ir, v, j, K, iPES, ichnl, i
         integer :: normWFunit
 
 !> Allocate asympotic range angular quadrature grids and weights
         allocate(asyANode(IALR%jasy))
         allocate(asyAWeight(IALR%jasy))
-!> Channel set as (v,j,K)
+!> Channel set as (v,j,K,iPES)
         call setChannel()
 !> Allocate wave function
-        allocate(asyAdiaWFvjK(nChannels,IALR%vasy))
-!        allocate(asyDiaWFvjK(nChannels,IALR%nr_PODVR))
-!        allocate(tmp(IALR%nr_PODVR, IALR%vasy))
         call getANodeAndWeight(initWP%jpar, IALR%jasy, asyANode, asyAWeight)
 
-!> Allocate PODVR array
+!> Allocate DVR and PODVR array
         allocate(adiaV(nPES,IALR%vint))
         allocate(DVREig(IALR%vint), DVRWF(IALR%vint,IALR%vint))
-        allocate(asyBC_AtDMat(nPES,IALR%vint))
-        allocate(asyBC_Evj(0:IALR%vasy,0:IALR%jasy))
-        allocate(asyPO2FBR(IALR%vasy,IALR%vasy))
-        allocate(asyBC_POWF(IALR%vasy,0:IALR%vasy,0:IALR%jasy))
+!        allocate(asyBC_AtDMat(nPES,IALR%vint))
+        allocate(asyBC_Evj(nPES,0:IALR%vasy,0:IALR%jasy))
+        allocate(asyBC_POWF(nPES,IALR%nPODVR,0:IALR%vasy,0:IALR%jasy))
+!        allocate(asyPO2FBR(IALR%vasy,IALR%vasy))
+        allocate(asyBC_DVRWF(nPES,IALR%vint,0:IALR%vasy,0:IALR%jasy))
 
 !> In this situation, bond(2) is the length of BC
 !> You should check the PES interface!
@@ -146,17 +144,20 @@ contains
         do ir = 1, IALR%vint
             bond(2) = r_Int(ir)
             call diagDiaVmat(bond,AtDMat,Vadia)
-            asyBC_AtDMat(:,ir) = AtDMat(:,initWP%initPES)
+!            asyBC_AtDMat(:,ir) = AtDMat(:,initWP%initPES)
             adiaV(:,ir) = Vadia(:)
         end do 
-!        dr = (IALR%r_range(2) - IALR%r_range(1)) / real(IALR%vint + 1, f8)
-!        range_rA = dr * (IALR%nr_asy + 1)
-        range_rA = IALR%r_range(2) - IALR%r_range(1)
-        call DVR_calc(IALR%vint,massBC,range_rA,adiaV,DVREig,DVRWF)
-        call PODVR(IALR%vasy,IALR%vint,DVRWF,r_Int,DVREig,massBC,r_Asy)
+        range_r = IALR%r_range(2) - IALR%r_range(1)
 
-        allocate(adiaVBC(nPES,IALR%vasy))
-        do ir = 1, IALR%vasy 
+        !> diag VBC in vj-PODVR
+        do iPES = 1, nPES
+            call DVR_vib(IALR%vint,iPES,massBC,range_r,adiaV,DVREig,DVRWF)
+            call PODVR(IALR%nPODVR,IALR%vint,iPES,DVRWF,r_Int,DVREig,massBC,r_Asy)
+            call DVR_vibRot(IALR%vint,iPES,massBC,range_r,r_Int,adiaV)
+        end do 
+
+        allocate(adiaVBC(nPES,IALR%nPODVR))
+        do ir = 1, IALR%nPODVR
             bond(2) = r_Asy(ir)
             call diagDiaVmat(bond,AtDMat,Vadia)
             adiaVBC(:,ir) = Vadia(:)
@@ -164,61 +165,28 @@ contains
 
         write(outFileUnit,'(1x,a)') '=====> Initail ro-vibrational state information <====='
         write(outFileUnit,'(1x,a)') ''
-        write(outFileUnit,'(1x,a,f15.9,a,f15.9,a)') 'PODVR grids range: [', r_Asy(1), ', ', r_Asy(IALR%vasy), '  ] a.u.'
+        write(outFileUnit,'(1x,a,f15.9,a,f15.9,a)') 'PODVR grids range: [', r_Asy(1), ', ', r_Asy(IALR%nPODVR), '  ] a.u.'
         write(outFileUnit,'(1x,a)') "Please ensure that the PODVR grid covers the relevant region of the BC potential!"
         write(outFileUnit,*) ''
 
         normWF = 0.0_f8
-        do ir = 1, IALR%nr_PODVR
-            normWF = normWF + asyBC_POWF(ir,initWP%v0,initWP%j0)**2
+        do ir = 1, IALR%nPODVR
+            normWF = normWF + asyBC_POWF(initWP%initPES,ir,initWP%v0,initWP%j0)**2
         end do 
 
-        Etot = Ecol + asyBC_Evj(initWP%v0, initWP%j0)
+        Etot = Ecol + asyBC_Evj(initWP%initPES,initWP%v0,initWP%j0)
 
-        write(outFileUnit,'(1x,a,2i2,a)') 'Initial ro-vibrational energy of (v0, j0) = (', initWP%v0, initWP%j0, ') state.'
-        write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2ev, ' eV.'
-        write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%v0,initWP%j0)*au2cm, ' cm-1.'
+        write(outFileUnit,'(1x,a,2i2,a,i2)') 'Initial ro-vibrational energy of (v0, j0) = (', initWP%v0, initWP%j0, ') at iPES = ', initWP%initPES
+        write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%initPES,initWP%v0,initWP%j0)*au2ev, ' eV.'
+        write(outFileUnit,'(1x,a,f15.9,a)') 'Evj of BC = ', asyBC_Evj(initWP%initPES,initWP%v0,initWP%j0)*au2cm, ' cm-1.'
         write(outFileUnit,'(1x,a)') 'Please check the energy!'
         write(outFileUnit,*) ''
         write(outFileUnit,'(1x,a,f15.9)') 'Initial ro-vibrational wave function normalization check: ', normWF
         write(outFileUnit,'(1x,a)') ''
 
-        asyAdiaWFvjK = 0.0_f8
-        do i = 1, nChannels
-            v = qn_channel(i,1)
-            j = qn_channel(i,2)
-            K = qn_channel(i,3)
-            if (v > IALR%vasy .or. j > IALR%jasy) cycle 
-            asyAdiaWFvjK(i,:) = asyBC_POWF(:,v,j)
-        end do
-
-        deallocate(adiaV, DVREig, DVRWF, asyBC_AtDMat)
+        deallocate(adiaV, DVREig, DVRWF)
 
     end subroutine asyBC_vibRotThetaWF
-!> ------------------------------------------------------------------------------------------------------------------ <!
-
-!> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine lrBC_vibRotThetaWF()
-        implicit none
-        integer :: ichnl, K, Kmax, nchnl 
-
-!> The long range WF is based on asyWF
-        call asyBC_vibRotThetaWF()
-        
-        allocate(lrBC_POWF(IALR%vasy))
-
-        lrBC_Evj = asyBC_Evj(initWP%v0,initWP%j0)
-        lrBC_POWF(:) = asyBC_POWF(:,initWP%v0,initWP%j0)
-
-        Kmax = min(initWP%Jtot,initWP%j0)
-        nchnl = Kmax - initWP%Kmin + 1
-        allocate(lrWFvjK(nchnl,IALR%vasy))
-        do K = initWP%Kmin, Kmax 
-            ichnl = seq_channel(initWP%v0,initWP%j0,K)
-            lrWFvjK(ichnl,:) = asyAdiaWFvjK(ichnl,:)
-        end do 
-    
-    end subroutine lrBC_vibRotThetaWF
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -257,52 +225,58 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine setChannel()
         implicit none
-        integer :: ichnl, v, j, K, Kmax
+        integer :: ichnl, v, j, K, Kmax, iPES
 
         ichnl = 0
-        do v = 0, IALR%vint  
-            do j = initWP%jmin, IALR%jint, initWP%jinc
-                Kmax = min(j, initWP%Jtot)
-                do K = initWP%Kmin, Kmax
-                    ichnl = ichnl + 1
+        do iPES = 1, nPES 
+            do v = 0, IALR%vasy   
+                do j = initWP%jmin, IALR%jasy, initWP%jinc
+                    Kmax = min(j, initWP%Jtot)
+                    do K = initWP%Kmin, Kmax
+                        ichnl = ichnl + 1
+                    end do
                 end do
             end do
-        end do
+        end do 
         nChannels = ichnl
 
-        allocate(qn_channel(nChannels,3))
+        allocate(qn_channel(nChannels,4))
         ichnl = 0
-        do v = 0, IALR%vint 
-            do j = initWP%jmin, IALR%jint, initWP%jinc
-                Kmax = min(j, initWP%Jtot)
-                do K = initWP%Kmin, Kmax
-                    ichnl = ichnl + 1
-                    qn_channel(ichnl,1) = v
-                    qn_channel(ichnl,2) = j
-                    qn_channel(ichnl,3) = K
+        do iPES = 1, nPES 
+            do v = 0, IALR%vasy 
+                do j = initWP%jmin, IALR%jasy, initWP%jinc
+                    Kmax = min(j, initWP%Jtot)
+                    do K = initWP%Kmin, Kmax
+                        ichnl = ichnl + 1
+                        qn_channel(ichnl,1) = v
+                        qn_channel(ichnl,2) = j
+                        qn_channel(ichnl,3) = K
+                        qn_channel(ichnl,4) = iPES 
+                    end do 
                 end do
             end do
         end do
 
-        Kmax = min(initWP%Jtot,IALR%jint)
-        allocate(seq_channel(0:IALR%vint,initWP%jmin:IALR%jint,initWP%Kmin:Kmax))
+        Kmax = min(initWP%Jtot,IALR%jasy)
+        allocate(seq_channel(0:IALR%vasy,initWP%jmin:IALR%jasy,initWP%Kmin:Kmax,nPES))
         seq_channel = -1
         do ichnl = 1, nChannels
             v = qn_channel(ichnl,1)
             j = qn_channel(ichnl,2)
             K = qn_channel(ichnl,3)
-            seq_channel(v,j,K) = ichnl
+            iPES = qn_channel(ichnl,4)
+            seq_channel(v,j,K,iPES) = ichnl
         end do
 
     end subroutine setChannel
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine DVR_calc(nDVR, mass, range, Vdiatom, eigVal, eigVec)
+    subroutine DVR_vib(nDVR, iPES, mass, range, Vdiatom, eigVal, eigVec)
 !> Calculate the DVR eigenvalues and eigenvectors for a given diatomic potential
 !> See J. Chem. Phys. Vol. 96 (3), 1 Feb 1992, pp 1982-1991
         implicit none
-        integer, intent(in) :: nDVR
+        integer, intent(in) :: nDVR, iPES
         real(f8), intent(in) :: mass, range
 !> Vdiatom: nPES x nDVR
         real(f8), intent(in) :: Vdiatom(:,:)
@@ -324,7 +298,7 @@ contains
                 end do
                 C(i,i) = fact * &
                          ((2.0_f8 * (n+1)**2 +1.0_f8) / 3.0_f8 - &
-                         (dsin(pi * i / (n+1)))**(-2)) + V(initWP%initPES,i)
+                         (dsin(pi * i / (n+1)))**(-2)) + V(iPES,i)
             end do 
             do i = 1, n
                 do j = i+1, n
@@ -341,7 +315,7 @@ contains
             call dsyev('V', 'U', n, C, n, eigVal, work, lwork, info)
             if (info /= 0) then
                 write(outFileUnit,*) "Error in DSYEV of DVR eigen, info =", info
-                write(outFileUnit,*) "POSITION: basis.f90, subroutine DVR_calc()"
+                write(outFileUnit,*) "POSITION: basis.f90, subroutine DVR_vib()"
                 stop
             end if
             deallocate(work)
@@ -349,15 +323,79 @@ contains
 
         end associate
 
-    end subroutine DVR_calc
+    end subroutine DVR_vib
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine PODVR(nPODVR, nDVR, DVRCoeff, DVRGrid, DVREig, mass, POGrid)
+    subroutine DVR_vibRot(nDVR, iPES, mass, range, Grids, Vadia)
+        implicit none
+        integer, intent(in) :: nDVR, iPES
+        real(f8), intent(in) :: mass, range
+        real(f8), intent(in) :: Vadia(:,:), Grids(:)
+        real(f8) :: eig(nDVR), vec(nDVR,nDVR), T(nDVR,nDVR)
+        integer :: i, j, info, lwork, v
+        real(f8), allocatable :: work(:)
+        real(f8) :: fact
+
+        associate(n => nDVR, C => vec)
+            fact = pi*pi/(4.0_f8*mass*range*range)
+            do i = 1, n 
+                do j = 1, i-1
+                    T(i,j) = fact  * &
+                             ((dsin(pi * (i-j) / (2.0_f8 * (n+1))))**(-2) - &
+                             (dsin(pi * (i+j) / (2.0_f8 * (n+1))))**(-2)) * (-1.0_f8) **(i-j)
+                end do
+                T(i,i) = fact * &
+                         ((2.0_f8 * (n+1)**2 +1.0_f8) / 3.0_f8 - &
+                         (dsin(pi * i / (n+1)))**(-2)) + Vadia(iPES,i)
+            end do 
+            do i = 1, n
+                do j = i+1, n
+                    T(i,j) = T(j,i)
+                end do
+            end do
+
+            C(:,:) = T(:,:)
+
+            do j = 0, IALR%jasy
+                do i = 1, nDVR
+                    C(i,i) = T(i,i) + real(j*(j+1),f8)/(2.0_f8*mass*Grids(i)**2)
+                end do 
+
+                allocate(work(1))
+                call dsyev('V', 'U', n, C, n, eig, work, -1, info)
+                lwork = int(work(1))
+                deallocate(work)
+
+                allocate(work(lwork))
+                call dsyev('V', 'U', n, C, n, eig, work, lwork, info)
+                if (info /= 0) then
+                    write(outFileUnit,*) "Error in DSYEV of DVR eigen, info =", info
+                    write(outFileUnit,*) "POSITION: basis.f90, subroutine DVR_vibRot()"
+                    stop
+                end if
+                deallocate(work)
+
+                do i = 1, n 
+                    call phaseTrans(n,C(:,i))
+                end do
+
+                do v = 0, IALR%vasy 
+                    asyBC_DVRWF(iPES,:,v,j) = C(:,v+1)  
+                end do 
+            end do 
+
+        end associate
+
+    end subroutine DVR_vibRot
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine PODVR(nPODVR, nDVR, iPES, DVRCoeff, DVRGrid, DVREig, mass, POGrid)
 !> Calculate the PODVR basis and eigenvalues/eigenfunctions for given DVR basis
 !> See Chemical Physics Letters 1992, 190 (3–4), 225–230.
         implicit none
-        integer, intent(in) :: nPODVR, nDVR
+        integer, intent(in) :: nPODVR, nDVR, iPES
         real(f8), intent(in) :: DVRCoeff(:,:)
         real(f8), intent(in) :: DVRGrid(:)
         real(f8), intent(in) :: DVREig(:)
@@ -450,19 +488,15 @@ contains
                 end if
                 deallocate(work)
 
-                asyPO2FBR = Xmat
+                !asyPO2FBR = Xmat
 
                 do i = 1, nPODVR
                     call phaseTrans(nPODVR, EMat(:,i))
                 end do 
 
-                do qn_v = 0, IALR%vasy
-                    asyBC_Evj(qn_v,qn_j) = POEig(qn_v+1)
-                end do
-                do i = 1, nPODVR
-                    do qn_v = 0, IALR%vasy
-                        asyBC_POWF(i,qn_v,qn_j) = EMat(i,qn_v+1)
-                    end do
+                do qn_v = 0, IALR%vasy 
+                    asyBC_Evj(iPES,qn_v,qn_j) = POEig(qn_v+1)
+                    asyBC_POWF(iPES,:,qn_v,qn_j) = EMat(:,qn_v+1)
                 end do
             end do
         end block

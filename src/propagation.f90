@@ -7,7 +7,7 @@ module propMod
     implicit none
 
     public
-    private :: getCPMat, getRotMat, getZKinMat, lambdaMinus, lambdaPlus
+    private :: getCPMat, getRotMat, getZKinMat, getVintMat, lambdaMinus, lambdaPlus
 
 contains 
 
@@ -21,19 +21,20 @@ contains
         call getZKinMat()
         call getCPMat()
         call getRotMat()
+        call getVintMat()
 
         TZmin = 0.0_f8
         Trmin = 0.0_f8
         Rotmin = 0.0_f8
         Umin = minval(CPMat)
-        Vmin = min(minval(INT_Vadia), minval(ALR_Vadia))
+        Vmin = minval(VintMat)
         Hmin = TZmin+Trmin+Rotmin+Umin+Vmin
 
         TZmax = (pi/(IALR%Z_range(2)-IALR%Z_range(1)))**2/(2.0_f8*massTot)
         Trmax = (pi/(IALR%r_range(2)-IALR%r_range(1)))**2/(2.0_f8*massBC)
         Rotmax = maxval(rotMat)
         Umax = maxval(CPMat)
-        Vmax = max(maxval(INT_Vadia), maxval(ALR_Vadia))
+        Vmax = maxval(VintMat)
         Hmax = TZmax+Trmax+Rotmax+Umax+Vmax
 
         Hplus = (Hmax+Hmin)/2.0_f8
@@ -42,10 +43,13 @@ contains
         Z_KinMat(:,:) = (Z_KinMat(:,:)-Hplus)/Hminus
         CPMat(:,:,:) = (CPMat(:,:,:)-Hplus)/Hminus
         rotMat(:,:) = (rotMat(:,:)-Hplus)/Hminus
-        asyBC_Evj(:,:) = (asyBC_Evj(:,:)-Hplus)/Hminus
+        asyBC_Evj(:,:,:) = (asyBC_Evj(:,:,:)-Hplus)/Hminus
         adiaVBC(:,:) = (adiaVBC(:,:)-Hplus)/Hminus
         INT_Vadia(:,:,:,:) = (INT_Vadia(:,:,:,:)-Hplus)/Hminus
-        ALR_Vadia(:,:,:,:) = (ALR_Vadia(:,:,:,:)-Hplus)/Hminus
+        VintMat(:,:,:) = (VintMat(:,:,:)-Hplus)/Hminus
+
+        allocate(VeffMat(IALR%nZ_IALR,nChannels,nChannels))
+        VeffMat(:,:,:) = CPMat(:,:,:)+VintMat(:,:,:)
 
 
     end subroutine HamScale
@@ -79,7 +83,7 @@ contains
             end do
         end do
     
-    end subroutine getKinMat
+    end subroutine getZKinMat
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -105,7 +109,7 @@ contains
         implicit none
         real(f8) ::  delta, term1, term2, term3
         real(f8), allocatable :: fact(:)
-        real(f8), allocatable :: CPE(:), CPM(:)
+        real(f8), allocatable :: CPE(:), CPM(:,:)
         real(f8), allocatable :: work(:)
         integer :: v, qn_j, vp, qn_jp, K, Kp
         integer :: iZ, ichnl, jchnl, lwork, info
@@ -126,7 +130,7 @@ contains
                 vp = qn_channel(jchnl,1)
                 qn_jp = qn_channel(jchnl,2)
                 Kp = qn_channel(jchnl,3)
-                if (v / = vp .or. qn_j /= qn_jp) cycle
+                if (v /= vp .or. qn_j /= qn_jp) cycle
 
                 term1 = merge((initWP%Jtot*(initWP%Jtot+1.0_f8)+qn_j*(qn_j+1.0_f8)-2.0_f8*K*K), &
                                0.0_f8, K == Kp)
@@ -175,6 +179,77 @@ contains
         deallocate(fact, CPM, CPE)
     end subroutine getCPMat
 !> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine getVintMat()
+        implicit none
+        real(f8) :: YjK, WFvjK, YjKp, WFvjKp
+        real(f8) :: w, cth
+        real(f8), external :: spgndr
+        integer :: v, vp, j, jp, K, Kp, iPES, jPES, ichnl, jchnl
+        integer :: iZ, irD, irP, ith, iZloc
+
+        allocate(VintMat(IALR%nZ_IALR,nChannels,nChannels))
+
+!> Vint(R) = <v'j'K'i'|V_i'i(R,r,theta)|vjKi>, i for PES
+!> See J. Chem. Phys. 162, 074301 (2025)
+        VintMat = 0.0_f8
+        do ichnl = 1, nChannels
+            do jchnl = 1, nChannels
+                v = qn_channel(ichnl,1)
+                j = qn_channel(ichnl,2)
+                K = qn_channel(ichnl,3)
+                iPES = qn_channel(ichnl,4)
+
+                vp = qn_channel(jchnl,1)
+                jp = qn_channel(jchnl,2)
+                Kp = qn_channel(jchnl,3)
+                jPES = qn_channel(jchnl,4)
+
+                if (K /= Kp) cycle 
+                if (iPES == jPES) then 
+                    !> Use PODVR WFvj 
+                    do iZ = IALR%nZ_I+1, IALR%nZ_IALR
+                        do irP = 1, IALR%nPODVR
+                            do ith = 1, IALR%jasy 
+                                iZloc = iZ - IALR%nZ_I
+                                cth = asyANode(ith)
+                                w = dsqrt(asyAWeight(ith))
+                                YjK = spgndr(j,K,cth)
+                                YjKp = spgndr(jp,K,cth)
+                                WFvjK = w*YjK*asyBC_POWF(iPES,irP,v,j)
+                                WFvjKp = w*YjKp*asyBC_POWF(jPES,irP,vp,jp)
+                                VintMat(iZ,ichnl,jchnl) = VintMat(iZ,ichnl,jchnl) &
+                                                          + WFvjK*ALR_Vdiag(iPES,iZloc,irP,ith)*WFvjKp
+                                VintMat(iZ,ichnl,jchnl) = min(VintMat(iZ,ichnl,jchnl), VMaxCut)
+                            end do 
+                        end do 
+                    end do 
+                else
+                    !> Use DVR WFvj
+                    do iZ = IALR%nZ_I+1, IALR%nZ_IALR
+                        do irD = 1, IALR%vint 
+                            do ith = 1, IALR%jasy 
+                                iZloc = iZ - IALR%nZ_I
+                                cth = asyANode(ith)
+                                w = dsqrt(asyAWeight(ith))
+                                YjK = spgndr(j,K,cth)
+                                YjKp = spgndr(jp,K,cth)
+                                WFvjK = w*YjK*asyBC_DVRWF(iPES,irD,v,j)
+                                WFvjKp = w*YjKp*asyBC_DVRWF(jPES,irD,vp,jp)
+                                VintMat(iZ,ichnl,jchnl) = VintMat(iZ,ichnl,jchnl) &
+                                                          + WFvjK*ALR_Voff(iPES,jPES,iZloc,irD,ith)*WFvjKp
+                                VintMat(iZ,ichnl,jchnl) = min(VintMat(iZ,ichnl,jchnl), VMaxCut)
+                            end do 
+                        end do 
+                    end do 
+                end if 
+            end do 
+        end do 
+
+    end subroutine getVintMat
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
     real(f8) function lambdaPlus(J,K) result(res)

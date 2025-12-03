@@ -1,6 +1,6 @@
 module machina_basic
     use iso_fortran_env
-    use MKL_DFTI
+!    use MKL_DFTI
     implicit none
     private
     public :: i4, i8
@@ -25,15 +25,15 @@ module machina_basic
     ! kind specifier of 16 byte complex
     integer, parameter :: c16 = real128
 
-    type, public :: DSTClass
-        type(DFTI_DESCRIPTOR), pointer :: handle => null()
-        integer :: err 
-    contains 
-        procedure :: create
-        procedure :: forward 
-        procedure :: backward 
-        procedure :: destroy
-    end type DSTClass
+!    type, public :: DSTClass
+!        type(DFTI_DESCRIPTOR), pointer :: handle => null()
+!        integer :: err 
+!    contains 
+!        procedure :: create
+!        procedure :: forward 
+!        procedure :: backward 
+!        procedure :: destroy
+!    end type DSTClass
 
     interface BinReadWrite
         module procedure realBinReadWrite4D
@@ -93,44 +93,44 @@ contains
 
 !> FFTClass
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine create(this, n)
-        implicit none
-        class(CSTClass) :: this
-        integer, intent(in) :: n
+!    subroutine create(this, n)
+!        implicit none
+!        class(CSTClass) :: this
+!        integer, intent(in) :: n
 
-        this%err = DftiCreateDescriptor(this%handle, DFTI_DOUBLE, DFTI_COMPLEX, 1, n)
-        this%err = DftiSetValue(this%handle, DFTI_PLACEMENT, DFTI_INPLACE)
-        this%err = DftiCommitDescriptor(this%handle)
-    end subroutine create
+!        this%err = DftiCreateDescriptor(this%handle, DFTI_DOUBLE, DFTI_COMPLEX, 1, n)
+!        this%err = DftiSetValue(this%handle, DFTI_PLACEMENT, DFTI_INPLACE)
+!        this%err = DftiCommitDescriptor(this%handle)
+!    end subroutine create
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine forward(this, DataF)
-        implicit none
-        class(CSTClass) :: this 
-        complex(c8), intent(inout) :: DataF(:)
+!    subroutine forward(this, DataF)
+!        implicit none
+!        class(CSTClass) :: this 
+!        complex(c8), intent(inout) :: DataF(:)
 
-        this%err = DftiComputeForward(this%handle, DataF)
-    end subroutine forward
+!        this%err = DftiComputeForward(this%handle, DataF)
+!    end subroutine forward
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine backward(this, DataI)
-        implicit none
-        class(CSTClass) :: this 
-        complex(c8), intent(inout) :: DataI(:)
+!    subroutine backward(this, DataI)
+!        implicit none
+!        class(CSTClass) :: this 
+!        complex(c8), intent(inout) :: DataI(:)
 
-        this%err = DftiComputeBackward(this%handle, DataI)
-    end subroutine backward
+!        this%err = DftiComputeBackward(this%handle, DataI)
+!    end subroutine backward
 !> ------------------------------------------------------------------------------------------------------------------ <!
     
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine destroy(this)
-        implicit none
-        class(CSTClass) :: this 
+!    subroutine destroy(this)
+!        implicit none
+!        class(CSTClass) :: this 
 
-        this%err = DftiFreeDescriptor(this%handle)
-    end subroutine destroy
+!        this%err = DftiFreeDescriptor(this%handle)
+!    end subroutine destroy
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 end module machina_basic

@@ -144,17 +144,19 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine interactionPot(nZ, nr, nth, ZGrid, rGrid, thGrid, type, Vadia, AtD)
+    subroutine interactionPot(nZ, nr, nth, ZGrid, rGrid, thGrid, type, Vdiag, Voff, VINT, AtD)
         implicit none
         integer, intent(in) :: nZ, nr, nth 
         real(f8), intent(in) :: ZGrid(nZ), rGrid(nr), thGrid(nth) 
         character(len=*), intent(in) :: type 
-        real(f8), intent(inout) :: Vadia(:,:,:,:)
-        real(f8), intent(inout) :: AtD(:,:,:,:,:)
+        real(f8), optional, intent(inout) :: VINT(:,:,:,:)
+        real(f8), optional, intent(inout) :: Vdiag(:,:,:,:)
+        real(f8), optional, intent(inout) :: Voff(:,:,:,:,:)
+        real(f8), optional, intent(inout) :: AtD(:,:,:,:,:)
         real(f8) :: bond(3)
-        real(f8) :: adiaV(nPES), AtDMat(nPES,nPES)
+        real(f8) :: adiaV(nPES), diaV(nPES,nPES), AtDMat(nPES,nPES)
         real(f8) :: Z, r, th
-        integer :: iZ, ir, ith
+        integer :: iZ, ir, ith, iPES, jPES
         character(len=256) :: fileName
 
         do iZ = 1, nZ
@@ -165,20 +167,62 @@ contains
                 !> The grids of Gauss-Legendre are in [-1, 1], need to convert to [0, pi]
                     th = acos(thGrid(ith))
                     call Jacobi2Bond(Z, r, th, atomMass(2), atomMass(3), bond)
-                    call diagDiaVmat(bond, AtDMat, adiaV) 
-                    Vadia(:,iZ,ir,ith) = adiaV(:)
-                    AtD(:,:,iZ,ir,ith) = AtDMat(:,:)
+                    if (type == 'INT') then 
+                        call diagDiaVmat(bond, AtDMat, adiaV) 
+                        VINT(:,iZ,ir,ith) = adiaV(:)
+                        AtD(:,:,iZ,ir,ith) = AtDMat(:,:)
+                    else if (type == 'ALR' .and. present(Vdiag)) then 
+                        call POT0(nPES,diaV,bond)
+                        do iPES = 1, nPES 
+                            Vdiag(iPES,iZ,ir,ith) = diaV(iPES,iPES)-adiaVBC(iPES,ir)
+                        end do 
+                    end if
                 end do
             end do
         end do
 
-!> Type = 'INT', for the vint * nZ_I range
-!> Type = 'ALR', for the vasy * (nZ_asy+nZ_lr) range 
-        fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'
-        call BinReadWrite(fileName, Vadia, 'write')
+        if (type == 'ALR' .and. present(Voff)) then 
+            Voff = 0.0_f8
+            do iZ = 1, nZ
+                Z = ZGrid(iZ)
+                do ir = 1, nr
+                    r = rGrid(ir)
+                    do ith = 1, nth
+                        th = acos(thGrid(ith))
+                        call Jacobi2Bond(Z, r, th, atomMass(2), atomMass(3), bond)
+                        call POT0(nPES,diaV,bond)
+                        do iPES = 1, nPES 
+                            do jPES = 1, nPES
+                                if (iPES == jPES) cycle
+                                Voff(iPES,jPES,iZ,ir,ith) = diaV(iPES,jPES)
+                            end do
+                        end do 
+                    end do
+                end do
+            end do
+        end if
 
-        fileName = 'AtD_'//trim(outfile)//'_'//trim(type)//'.bin'
-        call BinReadWrite(fileName, AtD, 'write')
+!> Type = 'INT', for the vint * nZ_I range
+!> Type = 'ALR', for the nPODVR/nDVR * (nZ_asy+nZ_lr) range 
+        if (present(VINT)) then
+            fileName = 'Vint_'//trim(outfile)//'_'//trim(type)//'.bin'
+            call BinReadWrite(fileName, VINT, 'write')
+        end if
+
+        if (present(Voff)) then
+            fileName = 'Voff_'//trim(outfile)//'_'//trim(type)//'.bin'
+            call BinReadWrite(fileName, Voff, 'write')
+        end if
+
+        if (present(Vdiag)) then
+            fileName = 'Vdiag_'//trim(outfile)//'_'//trim(type)//'.bin'
+            call BinReadWrite(fileName, Vdiag, 'write')
+        end if
+
+        if (present(AtD)) then
+            fileName = 'AtD_'//trim(outfile)//'_'//trim(type)//'.bin'
+            call BinReadWrite(fileName, AtD, 'write')
+        end if
 
 
     end subroutine interactionPot
@@ -202,10 +246,11 @@ contains
         type = 'INT'
         if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the interaction region...'
-            call interactionPot(IALR%nZ_I, IALR%vint, IALR%jint, Z_I, r_Int, intANode, type, INT_Vadia, INT_AtD)
+            call interactionPot(nZ=IALR%nZ_I, nr=IALR%vint, nth=IALR%jint, ZGrid=Z_I, &
+                                rGrid=r_Int, thGrid=intANode, type=type, VINT=INT_Vadia, AtD=INT_AtD)
         else if (trim(potentialType) == 'Read') then 
 
-            fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'
+            fileName = 'Vint_'//trim(outfile)//'_'//trim(type)//'.bin'
             call BinReadWrite(fileName, INT_Vadia, 'read')
             write(outFileUnit,'(1x,a,a)') 'Read INT_Vadia in file: ', trim(fileName)
 
@@ -221,23 +266,27 @@ contains
 !> Interaction potential in the asymptotic and long-range region
         nZ_ALR = IALR%nZ_IALR-IALR%nZ_I
         allocate(Z_ALR(nZ_ALR))
-        Z_ALR(1:IALR%nZ_IA) = Z_IALR(IALR%nZ_I+1:IALR%nZ_IALR)
+        Z_ALR(1:nZ_ALR) = Z_IALR(IALR%nZ_I+1:IALR%nZ_IALR)
 
-        allocate(ALR_Vadia(nPES,nZ_ALR,IALR%vasy,IALR%jasy))
-        allocate(ALR_AtD(nPES,nPES,nZ_ALR,IALR%vasy,IALR%jasy))
+        allocate(ALR_Vdiag(nPES,nZ_ALR,IALR%nPODVR,IALR%jasy))
+        allocate(ALR_Voff(nPES,nPES,nZ_ALR,IALR%vint,IALR%jasy))
         type = 'ALR'
         if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the asymptotic and long-range region...'
-            call interactionPot(nZ_ALR, IALR%vasy, IALR%jasy, Z_ALR, r_Asy, asyANode, type, ALR_Vadia, ALR_AtD)
+            call interactionPot(nZ=nZ_ALR, nr=IALR%nPODVR, nth=IALR%jasy, ZGrid=Z_ALR, &
+                                rGrid=r_Asy, thGrid=asyANode, type=type, Vdiag=ALR_Vdiag)
+            call interactionPot(nZ=nZ_ALR, nr=IALR%vint, nth=IALR%jasy, ZGrid=Z_ALR, &
+                                rGrid=r_Int, thGrid=asyANode, type=type, Voff=ALR_Voff)
         else if (trim(potentialType) == 'Read') then 
 
-            fileName = 'Vadia_'//trim(outfile)//'_'//trim(type)//'.bin'
-            call BinReadWrite(fileName, ALR_Vadia, 'read')
-            write(outFileUnit,'(1x,a,a)') 'Read ALR_Vadia in file: ', trim(fileName)
+            fileName = 'Vdiag_'//trim(outfile)//'_'//trim(type)//'.bin'
+            call BinReadWrite(fileName, ALR_Vdiag, 'read')
+            write(outFileUnit,'(1x,a,a)') 'Read ALR_Vdia in file: ', trim(fileName)
 
-            fileName = 'AtD_'//trim(outfile)//'_'//trim(type)//'.bin'
-            call BinReadWrite(fileName, ALR_AtD, 'read')
-            write(outFileUnit,'(1x,a,a)') 'Read ALR_AtD in file: ', trim(fileName)
+            fileName = 'Voff_'//trim(outfile)//'_'//trim(type)//'.bin'
+            call BinReadWrite(fileName, ALR_Voff, 'read')
+            write(outFileUnit,'(1x,a,a)') 'Read ALR_Voff in file: ', trim(fileName)
+
         else 
             write(outFileUnit,'(1x,a)') 'Error: unknown potentialType, must Read or New !'
             write(outFileUnit,'(1x,a)') 'POSITION: potent.f90, subroutine getIntPot()'
