@@ -88,12 +88,11 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
-    subroutine getVabs(range, Cabs, nGird, grid, dt, nabs, VabsMat)
+    subroutine getVabs(range, Cabs, nGird, grid, nabs, VabsMat)
         implicit none
         real(f8), intent(in) :: range, Cabs 
         integer, intent(in) :: nGird 
         real(f8), intent(in) :: grid(nGird)
-        integer, intent(in) :: dt
         integer, intent(out) :: nabs
         real(f8), allocatable, intent(inout) :: VabsMat(:)
         real(f8) :: rangeAll, rangeNoAbs
@@ -102,9 +101,10 @@ contains
 !> Since DVR grid don't have the boundary point
         rangeAll = grid(nGird) + grid(2) - grid(1)
         rangeNoAbs = rangeAll - range
+        nabs = 0
         do i = 1, nGird
             if (grid(i) >= rangeNoAbs) then
-                VabsMat(i) = dexp(-Cabs * ((grid(i)-rangeNoAbs)/(rangeAll - rangeNoAbs))**2 * dt)
+                VabsMat(i) = dexp(-Cabs * ((grid(i)-rangeNoAbs)/(rangeAll - rangeNoAbs))**2 * timeStep)
             else
                 VabsMat(i) = 1.0_f8
                 nabs = i
@@ -128,16 +128,16 @@ contains
 !> Vabs in r
         allocate(Fabs(IALR%vint))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in r:'
-        call getVabs(Vabs%rabs_range,Vabs%Cr,IALR%vint,r_Int,timeStep,Vabs%nrabs,Fabs)
+        call getVabs(Vabs%rabs_range,Vabs%Cr,IALR%vint,r_Int,Vabs%nrabs,Fabs)
 !> Vabs in long-range
         allocate(Flr(IALR%nZ_IALR))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in Z_lr:'
-        call getVabs(Vabs%Zlr_range,Vabs%Clr,IALR%nZ_IALR,Z_IALR,timeStep,Vabs%nZlr,Flr)
+        call getVabs(Vabs%Zlr_range,Vabs%Clr,IALR%nZ_IALR,Z_IALR,Vabs%nZlr,Flr)
 !> Vabs in asymptotic
         allocate(Fasy(IALR%nZ_IA))
         write(outFileUnit,'(1x,a)') 'Absorbing potential in Z_asy:'
         write(outFileUnit,'(1x,a)') 'Note that the Vabs only works for the channel with (v, j, iPES) /= (v0, j0, initPES)!'
-        call getVabs(Vabs%Zasy_range,Vabs%Casy,IALR%nZ_IA,Z_IA,timeStep,Vabs%nZasy,Fasy)
+        call getVabs(Vabs%Zasy_range,Vabs%Casy,IALR%nZ_IA,Z_IA,Vabs%nZasy,Fasy)
         write(outFileUnit,'(1x,a)') ''
 
     end subroutine initAllVabs
@@ -203,7 +203,7 @@ contains
         end if
 
 !> Type = 'INT', for the vint * nZ_I range
-!> Type = 'ALR', for the nPODVR/nDVR * (nZ_asy+nZ_lr) range 
+!> Type = 'ALR', for the nPODVR/nDVR * Z_IALR range 
         if (present(VINT)) then
             fileName = 'Vint_'//trim(outfile)//'_'//trim(type)//'.bin'
             call BinReadWrite(fileName, VINT, 'write')
@@ -231,9 +231,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine getIntPot()
         implicit none
-        integer :: nZ_ALR
         integer :: streamUnit 
-        real(f8), allocatable :: Z_ALR(:)
         character(len=3) :: type
         character(len=256) :: fileName
         
@@ -263,19 +261,16 @@ contains
             stop
         end if
 
-!> Interaction potential in the asymptotic and long-range region
-        nZ_ALR = IALR%nZ_IALR-IALR%nZ_I
-        allocate(Z_ALR(nZ_ALR))
-        Z_ALR(1:nZ_ALR) = Z_IALR(IALR%nZ_I+1:IALR%nZ_IALR)
+!> Interaction potential in the IALR region
 
-        allocate(ALR_Vdiag(nPES,nZ_ALR,IALR%nPODVR,IALR%jasy))
-        allocate(ALR_Voff(nPES,nPES,nZ_ALR,IALR%vint,IALR%jasy))
+        allocate(ALR_Vdiag(nPES,IALR%nZ_IALR,IALR%nPODVR,IALR%jasy))
+        allocate(ALR_Voff(nPES,nPES,IALR%nZ_IALR,IALR%vint,IALR%jasy))
         type = 'ALR'
         if (trim(potentialType) == 'New') then 
             write(outFileUnit,'(1x,a)') 'Calculating interaction potential in the asymptotic and long-range region...'
-            call interactionPot(nZ=nZ_ALR, nr=IALR%nPODVR, nth=IALR%jasy, ZGrid=Z_ALR, &
+            call interactionPot(nZ=IALR%nZ_IALR, nr=IALR%nPODVR, nth=IALR%jasy, ZGrid=Z_IALR, &
                                 rGrid=r_Asy, thGrid=asyANode, type=type, Vdiag=ALR_Vdiag)
-            call interactionPot(nZ=nZ_ALR, nr=IALR%vint, nth=IALR%jasy, ZGrid=Z_ALR, &
+            call interactionPot(nZ=IALR%nZ_IALR, nr=IALR%vint, nth=IALR%jasy, ZGrid=Z_IALR, &
                                 rGrid=r_Int, thGrid=asyANode, type=type, Voff=ALR_Voff)
         else if (trim(potentialType) == 'Read') then 
 

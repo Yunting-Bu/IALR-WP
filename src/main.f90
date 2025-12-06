@@ -11,8 +11,8 @@ program IALR_WP_CRWP
     call initPara()
     call DVR_IALR()
     call getInitTotWP()
-    call initAllVabs()
     call getIntPot()
     call getEnergyAM()
     call HamScale() 
+    call initAllVabs()
 end program IALR_WP_CRWP

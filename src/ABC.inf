@@ -44,7 +44,6 @@
 ! Parameters for propagation
 &propagation
     timeTot           = 1000000                     ! Total propagation time
-    timeStep          = 10                          ! Time step for propagation
     timePrint         = 1000                        ! Time interval for printing
 /
 

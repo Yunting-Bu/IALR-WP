@@ -16,8 +16,8 @@ module gPara
     real(f8), parameter :: amu2au = 1822.888486209_f8
     real(f8), parameter :: pi = 4.0_f8*atan(1.0_f8)
     real(f8), parameter :: one = 1.0_f8
-    real(c8), parameter :: img = (0.0_f8, 1.0_f8)
-    real(c8), parameter :: imgZore = (0.0_f8, 0.0_f8)
+    complex(c8), parameter :: img = (0.0_c8, 1.0_c8)
+    complex(c8), parameter :: imgZore = (0.0_c8, 0.0_c8)
    
 !> ========== Global Parameters ==========
 
@@ -56,7 +56,8 @@ module gPara
 
 !> Task types and propagation settings
     integer :: reactChannel, nPES, energyUnit
-    integer :: timeTot, timeStep, timePrint
+    integer :: timeTot, timePrint
+    real(f8) :: timeStep
 !> Energy input
     integer :: nEtot, outFileUnit
     real(f8) :: E_range(2), dE, TMaxCut, VMaxCut 
@@ -82,6 +83,8 @@ module gPara
     integer :: nChannels
     integer, allocatable :: qn_channel(:,:)
     integer, allocatable :: seq_channel(:,:,:,:)
+    integer :: nLrChnl 
+    integer, allocatable :: lrChnlNo(:)
 !> I - interaction region
 !> A - asymptotic region
 !> LR - long range region
@@ -111,12 +114,16 @@ module gPara
     real(f8), allocatable :: rotMat(:,:)
     real(f8), allocatable :: CPMat(:,:,:)
     real(f8), allocatable :: VintMat(:,:,:)
-    real(f8), allocatable :: VeffMat(:,:,:) !> CP + Vint
+    !> Veff = CP + Vint
+    real(f8), allocatable :: VeffMat(:,:,:)
     real(f8), allocatable :: adiaVBC(:,:)
 !> Wave packet during propagation
-    real(f8), allocatable :: lrWP(:,:,:,:)
-    real(f8), allocatable :: asyWP(:,:,:,:)
+    real(f8), allocatable :: ALR_TDWF(:,:)
+    !> p for k+1, m for k-1, ALR_TD for k
+    real(f8), allocatable :: ALR_auxWFp(:,:)
+    real(f8), allocatable :: ALR_auxWFm(:,:)
     real(f8), allocatable :: intWP(:,:,:,:)
+    complex(c8), allocatable :: ALR_TIDWF(:,:,:)
 !> Chebyshev 
     real(f8), allocatable :: ChebyAngle(:)
     real(f8) :: Hplus, Hminus
@@ -138,7 +145,7 @@ module gPara
     namelist /initWavePacket/ initWP
     namelist /IALRset/ IALR
     namelist /VabsAndDump/ Vabs
-    namelist /propagation/ timeTot, timeStep, timePrint
+    namelist /propagation/ timeTot, timePrint
     namelist /productChannel1/ channel1
     namelist /productChannel2/ channel2
 
@@ -234,6 +241,7 @@ contains
         nEtot = int((E_range(2) - E_range(1))/dE) + 1
         allocate(Ecol(nEtot),Etot(nEtot),kReact(nEtot))
         allocate(initAM(nEtot))
+        allocate(ChebyAngle(nEtot))
         do iEtot = 1, nEtot 
             Ecol(iEtot) = E_range(1) + (iEtot-1)*dE 
             if (Ecol(iEtot) > E_range(2)) then

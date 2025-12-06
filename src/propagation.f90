@@ -12,11 +12,91 @@ module propMod
 contains 
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine preWF0AndWF1()
+        implicit none
+        integer :: iEtot
+       
+        allocate(ALR_TDWF(IALR%nZ_IALR,nChannels))
+        allocate(ALR_auxWFm(IALR%nZ_IALR,nChannels))
+        allocate(ALR_auxWFp(IALR%nZ_IALR,nChannels))
+        allocate(ALR_TIDWF(IALR%nZ_IALR,nChannels,nEtot))
+
+        !> |WFp> = D(2*\hat{H_s} |TDWF> - D* |WFm>)
+        !> For k = 1, |WFm> = |phi0>, |TDWF> = |phi1>
+        !> |phi0> = |initWP>, |phi1> = \hat{H_s}|phi0>
+
+        ALR_auxWFm = initTotWP
+        ALR_TDWF = initTotWP
+        
+        call lrHamAction(ALR_TDWF)
+        call asyHamAction(ALR_TDWF)
+        !> Add interaction range later
+
+        do iEtot = 1, nEtot
+            ALR_TIDWF(:,:,iEtot) = cmplx(initTotWP(:,:),0.0_f8, kind=c8)
+        end do 
+
+    end subroutine preWF0AndWF1
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine ChebyshevRecursion()
+        implicit none
+        real(f8) :: auxWF(IALR%nZ_IALR,nChannels)
+        real(f8) :: auxWF1(IALR%nZ_IALR,nChannels)
+
+        !> |WFp> = D(2*\hat{H_s} |TDWF> - D* |WFm>)
+        !> Long-range 
+        call lrHamAction(ALR_TDWF)
+        !> Asymptotic range
+        call asyHamAction(ALR_TDWF)
+        !> interaction range
+        !> ...
+
+        auxWF = ALR_auxWFm
+        call dampAction(auxWF)
+        auxWF1 = ALR_TDWF
+        auxWF = 2.0_f8*ALR_TDWF - auxWF
+        call dampAction(auxWF)
+
+    end subroutine ChebyshevRecursion
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine dampAction(WF)
+        implicit none
+        real(f8), intent(inout) :: WF(:,:)
+        integer :: ichnl, v, j, iPES 
+                
+        !> Damp in lr
+        do ichnl = 1, nChannels
+            WF(:,ichnl) = Flr(:)*WF(:,ichnl)
+        end do 
+
+        !> Damp in asy
+        !> only action when v /= v0, j /= j0, iPES /= initPES
+        do ichnl = 1, nChannels
+            v = qn_channel(ichnl,1)
+            j = qn_channel(ichnl,2)
+            iPES = qn_channel(ichnl,4)
+            if (v == initWP%v0 .or. j == initWP%j0 .or. iPES == initWP%initPES) cycle 
+            WF(:,ichnl) = Fasy(:)*WF(:,ichnl)
+        end do 
+
+        !> Damp in int
+        !> ...
+
+    end subroutine dampAction
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine HamScale()
         implicit none
         real(f8) :: TZmax, TZmin, Trmax, Trmin 
         real(f8) :: Vmax, Vmin, Umax, Umin, Rotmax, Rotmin 
         real(f8) :: Hmax, Hmin
+        real(f8) :: dtMin, dtMax
+        integer :: iEtot
 
         call getZKinMat()
         call getCPMat()
@@ -27,14 +107,14 @@ contains
         Trmin = 0.0_f8
         Rotmin = 0.0_f8
         Umin = minval(CPMat)
-        Vmin = minval(VintMat)
+        Vmin = minval(INT_Vadia)
         Hmin = TZmin+Trmin+Rotmin+Umin+Vmin
 
         TZmax = (pi/(IALR%Z_range(2)-IALR%Z_range(1)))**2/(2.0_f8*massTot)
         Trmax = (pi/(IALR%r_range(2)-IALR%r_range(1)))**2/(2.0_f8*massBC)
         Rotmax = maxval(rotMat)
         Umax = maxval(CPMat)
-        Vmax = maxval(VintMat)
+        Vmax = maxval(INT_Vadia)
         Hmax = TZmax+Trmax+Rotmax+Umax+Vmax
 
         Hplus = (Hmax+Hmin)/2.0_f8
@@ -51,8 +131,108 @@ contains
         allocate(VeffMat(IALR%nZ_IALR,nChannels,nChannels))
         VeffMat(:,:,:) = CPMat(:,:,:)+VintMat(:,:,:)
 
+        do iEtot = 1, nEtot
+            ChebyAngle(iEtot) = acos((Etot(iEtot)-Hplus)/Hminus)
+        end do
+        
+        dtMin = 1.0_f8/(Hminus*sin(maxval(ChebyAngle)))
+        dtMax = 1.0_f8/(Hminus*sin(minval(ChebyAngle)))
+        timeStep = (dtMax+dtMin)/2.0_f8
+
+        write(outFileUnit,'(1x,a)') '=====> Chebyshev scale information <====='
+        write(outFileUnit,'(1x,a,f12.5,2x,a,f12.5)') 'Hmax = ', Hmax, 'Hmin = ', Hmin 
+        write(outFileUnit,'(1x,a,f12.5)') 'TimeStep Max = ', dtMax
+        write(outFileUnit,'(1x,a,f12.5)') 'TimeStep Min = ', dtMin 
+        write(outFileUnit,'(1x,a,f12.5)') 'TimeStep Avg = ', timeStep
+        write(outFileUnit,*) ''
+
 
     end subroutine HamScale
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine asyHamAction(WF)
+        implicit none
+        real(f8), intent(inout) :: WF(:,:)
+        real(f8), allocatable :: Wtemp(:,:)
+        real(f8) :: alpha, beta 
+        integer :: iZ, ichnl, v, j, iPES
+
+        allocate(Wtemp(IALR%nZ_IALR,nChannels))
+
+        alpha = 1.0_f8
+        beta = 0.0_f8
+        !> Action of \hat{T_R}
+        call dgemm('N', 'N', IALR%nZ_IALR, nChannels, IALR%nZ_IALR, alpha, & 
+                    Z_KinMat, IALR%nZ_IALR, WF, IALR%nZ_IALR, beta, Wtemp, IALR%nZ_IALR)
+        WF = Wtemp
+
+        !> Action of \hat{h(r)}
+        do ichnl = 1, nChannels
+            v = qn_channel(ichnl,1)
+            j = qn_channel(ichnl,2)
+            iPES = qn_channel(ichnl,4)
+            WF(:,ichnl) = WF(:,ichnl) * asyBC_Evj(iPES,v,j)
+        end do 
+
+        !> Action of \hat{U}+\hat{Vint}
+        do iZ = 1, IALR%nZ_IALR 
+            call dgemv('N', nChannels, nChannels, alpha, VeffMat(iZ,:,:), &
+                        nChannels, WF(iZ,:), 1, beta, Wtemp(iZ,:), 1)
+        end do 
+        WF = Wtemp
+        deallocate(Wtemp)
+
+    end subroutine asyHamAction
+!> ------------------------------------------------------------------------------------------------------------------ <!
+
+!> ------------------------------------------------------------------------------------------------------------------ <!
+    subroutine lrHamAction(WF)
+        implicit none
+        real(f8), intent(inout) :: WF(:,:)
+        integer :: iZ, i, j
+        real(f8), allocatable :: Wtemp(:,:), auxWF(:,:), Veff(:,:,:)
+        real(f8) :: alpha, beta
+
+        allocate(Wtemp(IALR%nZ_IALR,nLrChnl))
+        allocate(auxWF(IALR%nZ_IALR,nLrChnl))
+        allocate(Veff(nZ,nLrChnl,nLrChnl))
+
+        !> Construction of Veff and auxWF
+        do iZ = 1, IALR%nZ_IALR
+            do i = 1, nLrChnl
+                auxWF(iZ,i) = WF(iZ, lrChnlNo(i))
+                do j = 1, nLrChnl
+                    Veff(iZ,i,j) = VeffMat(iZ , lrChnlNo(i) , lrChnlNo(j))
+                end do
+            end do
+        end do
+
+        alpha = 1.0_f8
+        beta  = 0.0_f8
+
+        !> \hat{T_R}
+        call dgemm('N','N', IALR%nZ_IALR, nLrChnl, IALR%nZ_IALR, alpha, &
+                    Z_KinMat, nZ_IALR, auxWF, nZ_IALR, beta, Wtemp, nZ_IALR)
+        auxWF = Wtemp
+
+        !> \hat{h(r)}
+        auxWF(:,:) = auxWF(:,:) * asyBC_Evj(initWP%initPES,initWP%v0,initWP%j0)
+
+        !> \hat{U}+\hat{Vint}
+        do iZ = 1, IALR%nZ_IALR
+            call dgemv('N', nLrChnl, nLrChnl, alpha, Veff(iZ,:,:), &
+                    nLrChnl, auxWF(iZ,:), 1, beta, Wtemp(iZ,:), 1)
+        end do
+        auxWF = Wtemp
+
+        do i = nLrChnl
+            WF(:,lrChnlNo(i)) = auxWF(:,i)
+        end do
+
+        deallocate(Wtemp, Veff)
+
+    end subroutine lrHamAction
 !> ------------------------------------------------------------------------------------------------------------------ <!
         
 !> ------------------------------------------------------------------------------------------------------------------ <!
@@ -186,70 +366,84 @@ contains
         real(f8) :: YjK, WFvjK, YjKp, WFvjKp
         real(f8) :: w, cth
         real(f8), external :: spgndr
+        real(f8), allocatable :: YjK_table(:,:,:)
+        real(f8), allocatable :: WFvjK_PO(:,:)
+        real(f8), allocatable :: WFvjK_DVR(:,:)
         integer :: v, vp, j, jp, K, Kp, iPES, jPES, ichnl, jchnl
-        integer :: iZ, irD, irP, ith, iZloc
+        integer :: iZ, irD, irP, ith
+        integer :: nPtot, nDtot 
 
         allocate(VintMat(IALR%nZ_IALR,nChannels,nChannels))
+        allocate(YjK_table(IALR%jasy,0:IALR%jasy,0:max(IALR%jasy,initWP%Jtot)))
+        allocate(WFvjK_PO(IALR%nPODVR,nChannels))
+        allocate(WFvjK_DVR(IALR%vint,nChannels))
 
 !> Vint(R) = <v'j'K'i'|V_i'i(R,r,theta)|vjKi>, i for PES
 !> See J. Chem. Phys. 162, 074301 (2025)
+
+        do ith = 1, IALR%jasy 
+            do j = 0, IALR%jasy 
+                do K = 0, max(IALR%jasy,initWP%Jtot)
+                    if (K > j) cycle
+                    w = dsqrt(asyAWeight(ith))
+                    YjK_table(ith,j,K) = w*spgndr(j,K,cth)
+                end do 
+            end do 
+        end do
+        
+        do ichnl = 1, nChannels
+            v = qn_channel(ichnl,1)
+            j = qn_channel(ichnl,2)
+            K = qn_channel(ichnl,3)
+            iPES = qn_channel(ichnl,4)
+            do ith = 1, IALR%jasy 
+                WFvjK_PO(:,ichnl) = YjK_table(ith,j,K)*asyBC_POWF(iPES,:,v,j)
+                if (nPES == 1) cycle 
+                WFvjK_DVR(:,ichnl) = YjK_table(ith,j,K)*asyBC_DVRWF(iPES,:,v,j)
+            end do 
+        end do 
+
         VintMat = 0.0_f8
         do ichnl = 1, nChannels
             do jchnl = 1, nChannels
-                v = qn_channel(ichnl,1)
-                j = qn_channel(ichnl,2)
                 K = qn_channel(ichnl,3)
                 iPES = qn_channel(ichnl,4)
 
-                vp = qn_channel(jchnl,1)
-                jp = qn_channel(jchnl,2)
                 Kp = qn_channel(jchnl,3)
                 jPES = qn_channel(jchnl,4)
 
                 if (K /= Kp) cycle 
                 if (iPES == jPES) then 
                     !> Use PODVR WFvj 
-                    do iZ = IALR%nZ_I+1, IALR%nZ_IALR
+                    do iZ = 1, IALR%nZ_IALR
                         do irP = 1, IALR%nPODVR
                             do ith = 1, IALR%jasy 
-                                iZloc = iZ - IALR%nZ_I
-                                cth = asyANode(ith)
-                                w = dsqrt(asyAWeight(ith))
-                                YjK = spgndr(j,K,cth)
-                                YjKp = spgndr(jp,K,cth)
-                                WFvjK = w*YjK*asyBC_POWF(iPES,irP,v,j)
-                                WFvjKp = w*YjKp*asyBC_POWF(jPES,irP,vp,jp)
                                 VintMat(iZ,ichnl,jchnl) = VintMat(iZ,ichnl,jchnl) &
-                                                          + WFvjK*ALR_Vdiag(iPES,iZloc,irP,ith)*WFvjKp
-                                VintMat(iZ,ichnl,jchnl) = min(VintMat(iZ,ichnl,jchnl), VMaxCut)
+                                                          + WFvjK_PO(irP,ichnl)*ALR_Vdiag(iPES,iZloc,irP,ith) &
+                                                          * WFvjK_PO(irP,jchnl)
                             end do 
                         end do 
+                        VintMat(iZ,ichnl,jchnl) = min(VintMat(iZ,ichnl,jchnl), VMaxCut)
                     end do 
                 else
                     !> Use DVR WFvj
-                    do iZ = IALR%nZ_I+1, IALR%nZ_IALR
+                    do iZ = 1, IALR%nZ_IALR
                         do irD = 1, IALR%vint 
                             do ith = 1, IALR%jasy 
-                                iZloc = iZ - IALR%nZ_I
-                                cth = asyANode(ith)
-                                w = dsqrt(asyAWeight(ith))
-                                YjK = spgndr(j,K,cth)
-                                YjKp = spgndr(jp,K,cth)
-                                WFvjK = w*YjK*asyBC_DVRWF(iPES,irD,v,j)
-                                WFvjKp = w*YjKp*asyBC_DVRWF(jPES,irD,vp,jp)
                                 VintMat(iZ,ichnl,jchnl) = VintMat(iZ,ichnl,jchnl) &
-                                                          + WFvjK*ALR_Voff(iPES,jPES,iZloc,irD,ith)*WFvjKp
-                                VintMat(iZ,ichnl,jchnl) = min(VintMat(iZ,ichnl,jchnl), VMaxCut)
+                                                          + WFvjK_DVR(irD,ichnl)*ALR_Voff(iPES,jPES,iZloc,irD,ith) &
+                                                          * WFvjK_DVR(irD,jchnl)
                             end do 
                         end do 
+                        VintMat(iZ,ichnl,jchnl) = min(VintMat(iZ,ichnl,jchnl), VMaxCut)
                     end do 
                 end if 
             end do 
         end do 
+        deallocate(YjK_table,WFvjK_DVR,WFvjK_PO)
 
     end subroutine getVintMat
 !> ------------------------------------------------------------------------------------------------------------------ <!
-
 
 !> ------------------------------------------------------------------------------------------------------------------ <!
     real(f8) function lambdaPlus(J,K) result(res)

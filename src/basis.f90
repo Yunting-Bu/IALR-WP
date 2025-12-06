@@ -225,7 +225,7 @@ contains
 !> ------------------------------------------------------------------------------------------------------------------ <!
     subroutine setChannel()
         implicit none
-        integer :: ichnl, v, j, K, Kmax, iPES
+        integer :: ichnl, v, j, K, Kmax, iPES, idx
 
         ichnl = 0
         do iPES = 1, nPES 
@@ -242,6 +242,7 @@ contains
 
         allocate(qn_channel(nChannels,4))
         ichnl = 0
+        nLrChnl = 0
         do iPES = 1, nPES 
             do v = 0, IALR%vasy 
                 do j = initWP%jmin, IALR%jasy, initWP%jinc
@@ -252,20 +253,29 @@ contains
                         qn_channel(ichnl,2) = j
                         qn_channel(ichnl,3) = K
                         qn_channel(ichnl,4) = iPES 
+                        if (v = initWP%v0 .and. j = initWP%j0 .and. iPES = initWP%initPES) then 
+                            nLrChnl = nLrChnl + 1
+                        end if 
                     end do 
                 end do
             end do
         end do
 
         Kmax = min(initWP%Jtot,IALR%jasy)
+        allocate(lrChnlNo(nLrChnl))
         allocate(seq_channel(0:IALR%vasy,initWP%jmin:IALR%jasy,initWP%Kmin:Kmax,nPES))
         seq_channel = -1
+        idx = 0
         do ichnl = 1, nChannels
             v = qn_channel(ichnl,1)
             j = qn_channel(ichnl,2)
             K = qn_channel(ichnl,3)
             iPES = qn_channel(ichnl,4)
             seq_channel(v,j,K,iPES) = ichnl
+            if (v = initWP%v0 .and. j = initWP%j0 .and. iPES = initWP%initPES) then 
+                idx = idx + 1 
+                lrChnlNo(idx) = ichnl
+            end if
         end do
 
     end subroutine setChannel

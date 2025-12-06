@@ -100,19 +100,23 @@ contains
         phase = exp(-img*pi*0.5_f8*initWP%l0)
         wZ = dsqrt(Z_IALR(2)-Z_IALR(1))
 
+        !> rbZ - Ricatti-Bessel j_l
+        !> rbZU - Ricatti-Bessel y_l
+        !> Second kind Ricatti-Hankel: h^(2)_l = j_l - i*y_l 
+
         do iEtot = 1, nEtot
             initAM(iEtot) = imgZore
             do iZ = 1, IALR%nZ_IALR
                 call rbesjy(initWP%l0*1.0_f8, kReact(iEtot)*Z_IALR(iZ), rbZ, rbZP, rbZU, rbZUP)
                 initAM(iEtot) = initAM(iEtot) + fact/dsqrt(kReact(iEtot)) * &
-                                -img * cmplx(rbZU, -rbZ, kind=c8) * initGaussWP(iZ) * wZ
+                                phase * cmplx(-rbZU, rbZ, kind=c8) * initGaussWP(iZ) * wZ
             end do 
         end do
 
         write(outFileUnit,*) ''
         write(outFileUnit,'(1x,a)') '=====> Energy information <====='
         write(outFileUnit,'(1x,a)') ''
-        write(outFileUnit,'(1x,a5,3x,a20,3x,a20,3x,a20,3x,a20)') 'nEtot','Etot', 'Wave Number', 'Amplitude (real)', 'Amplitude (img)'
+        write(outFileUnit,'(1x,a5,3x,a20,3x,a20,3x,a20,3x,a20)') 'nEtot','Ecol', 'Wave Number', 'Amplitude (real)', 'Amplitude (img)'
         write(outFileUnit,'(1x,5("-"),3x,20("-"),3x,20("-"),3x,20("-"),3x,20("-"))')
         do iEtot = 1, nEtot
             write(outFileUnit,'(1x,i5,3x,f20.10,3x,f20.10,3x,f20.10,3x,f20.10)') iEtot, Ecol(iEtot)*au2ev, kReact(iEtot)*au2ev, &
